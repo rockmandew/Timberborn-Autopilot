@@ -1,0 +1,7 @@
+{
+  "Name": "Autopilot",
+  "Version": "0.1.0",
+  "Id": "TimberbornAutopilot",
+  "MinimumGameVersion": "1.0.0.0",
+  "Description": "Fully automated max-strategy colony: economy, water engineering, city planning, and achievement hunting run themselves while you watch."
+}

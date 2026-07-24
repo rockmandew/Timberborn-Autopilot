@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <AssemblyName>TimberbornAutopilot</AssemblyName>
+    <RootNamespace>TimberbornAutopilot</RootNamespace>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GameDir Condition="'$(GameDir)' == ''">D:\SteamLibrary\steamapps\common\Timberborn</GameDir>
+    <ManagedDir>$(GameDir)\Timberborn_Data\Managed</ManagedDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Game + Unity assemblies: compile against, never copy to output -->
+    <Reference Include="$(ManagedDir)\Timberborn.*.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Bindito.Core.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Bindito.Unity.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.Mathematics.dll" Private="false"
+               Condition="Exists('$(ManagedDir)\Unity.Mathematics.dll')" />
+  </ItemGroup>
+
+</Project>
