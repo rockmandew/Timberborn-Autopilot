@@ -16,6 +16,9 @@
     <!-- Game + Unity assemblies: compile against, never copy to output -->
     <Reference Include="$(ManagedDir)\Timberborn.*.dll" Private="false" />
     <Reference Include="$(ManagedDir)\Bindito.Core.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\System.Collections.Immutable.dll" Private="false"
+               Condition="Exists('$(ManagedDir)\System.Collections.Immutable.dll')" />
     <Reference Include="$(ManagedDir)\Bindito.Unity.dll" Private="false" />
     <Reference Include="$(ManagedDir)\UnityEngine.dll" Private="false" />
     <Reference Include="$(ManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
