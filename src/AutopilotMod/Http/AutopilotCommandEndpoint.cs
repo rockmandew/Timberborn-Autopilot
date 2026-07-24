@@ -8,6 +8,7 @@ using Timberborn.Coordinates;
 using Timberborn.HttpApiSystem;
 using Timberborn.PrioritySystem;
 using TimberbornAutopilot.Acting;
+using TimberbornAutopilot.Sensing;
 using UnityEngine;
 
 namespace TimberbornAutopilot.Http
@@ -32,6 +33,7 @@ namespace TimberbornAutopilot.Http
         private readonly ZonePlanner _zonePlanner;
         private readonly CrewManager _crewManager;
         private readonly SpeedController _speedController;
+        private readonly MapSurveyor _mapSurveyor;
 
         private readonly object _queueLock = new object();
         private readonly Queue<PendingCommand> _pending = new Queue<PendingCommand>();
@@ -39,12 +41,14 @@ namespace TimberbornAutopilot.Http
         public AutopilotCommandEndpoint(BuildPlacer buildPlacer,
                                         ZonePlanner zonePlanner,
                                         CrewManager crewManager,
-                                        SpeedController speedController)
+                                        SpeedController speedController,
+                                        MapSurveyor mapSurveyor)
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
             _crewManager = crewManager;
             _speedController = speedController;
+            _mapSurveyor = mapSurveyor;
         }
 
         /// <summary>Called by AutopilotService.Tick() on the main thread.</summary>
@@ -143,6 +147,10 @@ namespace TimberbornAutopilot.Http
                     return () => new { ok = _crewManager.TrySetDesiredWorkers(Coords(q), int.Parse(q["count"])) };
                 case "priority":
                     return () => new { ok = _crewManager.TrySetWorkplacePriority(Coords(q), ParsePriority(q["priority"])) };
+                case "survey":
+                    return () => _mapSurveyor.Survey(
+                        TryParseInt(q["x"]), TryParseInt(q["y"]),
+                        TryParseInt(q["r"]) ?? 24);
                 case "speed":
                     return () =>
                     {
@@ -152,6 +160,11 @@ namespace TimberbornAutopilot.Http
                 default:
                     return null;
             }
+        }
+
+        private static int? TryParseInt(string value)
+        {
+            return int.TryParse(value, out int parsed) ? parsed : (int?)null;
         }
 
         private static Vector3Int Coords(System.Collections.Specialized.NameValueCollection q)

@@ -15,7 +15,7 @@ namespace TimberbornAutopilot
     /// sense -> plan -> act loop (economy, water engineering, city planning).
     /// v0.2: sense layer — daily world reports + live HTTP status endpoint.
     /// </summary>
-    public class AutopilotService : ILoadableSingleton, ITickableSingleton
+    public class AutopilotService : ILoadableSingleton, ITickableSingleton, IUpdatableSingleton
     {
         private readonly EventBus _eventBus;
         private readonly WorldModel _worldModel;
@@ -45,8 +45,14 @@ namespace TimberbornAutopilot
 
         public void Tick()
         {
-            _commandEndpoint.ExecutePending();
             // Planner loop lands here in v0.5.
+        }
+
+        /// <summary>Runs every frame, even while the game is paused — remote
+        /// commands work at any time.</summary>
+        public void UpdateSingleton()
+        {
+            _commandEndpoint.ExecutePending();
         }
 
         [OnEvent]
