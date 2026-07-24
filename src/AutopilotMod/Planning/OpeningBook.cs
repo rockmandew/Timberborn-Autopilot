@@ -107,6 +107,12 @@ namespace TimberbornAutopilot.Planning
                 {
                     _brainLog.Note($"Raised builder priority on {boosted} survival-critical site(s).");
                 }
+                // Keep lumberjacks fed: re-mark live trees around every flag
+                // (idempotent; covers player-placed flags and regrown trees).
+                foreach (Vector3Int flag in _worldQuery.BuildingCoordinatesByName("LumberjackFlag"))
+                {
+                    MarkCuttingAreaAround(flag);
+                }
             }
             RepairConnectivity(networkRoot);
             CheckSuggestions(world);
@@ -353,9 +359,9 @@ namespace TimberbornAutopilot.Planning
 
         private void MarkCuttingAreaAround(Vector3Int flag)
         {
-            _zonePlanner.MarkTreesForCutting(
-                flag + new Vector3Int(-6, -6, 0), flag + new Vector3Int(6, 6, 0));
-            _brainLog.Note($"Marked the forest around ({flag.x},{flag.y}) for cutting.");
+            List<Vector3Int> trees = _worldQuery.ResourceCoordinatesNear(flag, 7, gatherable: false);
+            _zonePlanner.MarkTreeCoordinates(trees);
+            _brainLog.Note($"Marked {trees.Count} trees around ({flag.x},{flag.y}) for cutting.");
         }
 
         private void ConfigureStorage(Vector3Int at, string goodId, string label)

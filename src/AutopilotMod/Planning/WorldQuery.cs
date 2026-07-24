@@ -67,6 +67,25 @@ namespace TimberbornAutopilot.Planning
             return doorsteps;
         }
 
+        /// <summary>Coordinates of all buildings matching the base template name.</summary>
+        public List<Vector3Int> BuildingCoordinatesByName(string baseName)
+        {
+            var coordinates = new List<Vector3Int>();
+            foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
+            {
+                if (!NameMatches(building.GameObject.name, baseName))
+                {
+                    continue;
+                }
+                var blockObject = building.GetComponent<BlockObject>();
+                if (blockObject != null)
+                {
+                    coordinates.Add(blockObject.Coordinates);
+                }
+            }
+            return coordinates;
+        }
+
         /// <summary>Raises builder priority on every matching building still under
         /// construction. Returns how many were changed.</summary>
         public int BoostConstructionPriority(string baseName, Priority priority)
@@ -144,6 +163,29 @@ namespace TimberbornAutopilot.Planning
                 sum += positions[i];
             }
             return new Vector3Int(sum.x / take, sum.y / take, 0);
+        }
+
+        /// <summary>Exact block coordinates of live trees (cuttable) or bushes
+        /// (gatherable) within radius of the anchor — for precise area marking.</summary>
+        public List<Vector3Int> ResourceCoordinatesNear(Vector3Int anchor, int radius, bool gatherable)
+        {
+            var coordinates = new List<Vector3Int>();
+            foreach (NaturalResourceModel resource in _entityComponentRegistry.GetEnabled<NaturalResourceModel>())
+            {
+                bool matches = gatherable
+                    ? resource.HasComponent<Gatherable>()
+                    : resource.HasComponent<Cuttable>();
+                if (!matches)
+                {
+                    continue;
+                }
+                var blockObject = resource.GetComponent<BlockObject>();
+                if (blockObject != null && Distance(blockObject.Coordinates, anchor) <= radius)
+                {
+                    coordinates.Add(blockObject.Coordinates);
+                }
+            }
+            return coordinates;
         }
 
         private static int Distance(Vector3Int a, Vector3Int b)

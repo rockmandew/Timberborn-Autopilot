@@ -58,6 +58,12 @@ namespace TimberbornAutopilot.Acting
             _treeCuttingArea.AddCoordinates(tiles);
         }
 
+        /// <summary>Marks exact tree coordinates for cutting.</summary>
+        public void MarkTreeCoordinates(IEnumerable<Vector3Int> treeCoordinates)
+        {
+            _treeCuttingArea.AddCoordinates(treeCoordinates);
+        }
+
         private static IEnumerable<Vector3Int> Rectangle(Vector3Int from, Vector3Int to)
         {
             int x0 = Mathf.Min(from.x, to.x), x1 = Mathf.Max(from.x, to.x);
