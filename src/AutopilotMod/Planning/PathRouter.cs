@@ -51,6 +51,13 @@ namespace TimberbornAutopilot.Planning
             return true;
         }
 
+        /// <summary>True when a flat route from the network to the target exists —
+        /// used as a placement precondition so no building is born unreachable.</summary>
+        public bool CanReach(Vector3Int networkRoot, Vector3Int target)
+        {
+            return FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target)) != null;
+        }
+
         /// <summary>The district doorstep plus every existing path tile around it —
         /// guaranteed entry points into the real walkable network.</summary>
         private List<Vector3Int> NetworkSeeds(Vector3Int networkRoot)

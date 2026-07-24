@@ -125,6 +125,30 @@ namespace TimberbornAutopilot.Acting
             return EnsureUnlocked(buildingSpec, out error);
         }
 
+        /// <summary>Where the building's doorstep will land for a hypothetical
+        /// placement — same math as the game's PositionedEntrance (entrance
+        /// direction is Down at Cw0, rotated by orientation).</summary>
+        public Vector3Int? PredictDoorstep(string templateName, Vector3Int coordinates, Orientation orientation)
+        {
+            BuildingSpec buildingSpec = ResolveTemplate(templateName);
+            if (buildingSpec == null)
+            {
+                return null;
+            }
+            BlockObjectSpec blockObjectSpec = buildingSpec.GetSpec<BlockObjectSpec>();
+            if (blockObjectSpec.Entrance == null || !blockObjectSpec.Entrance.HasEntrance)
+            {
+                return null;
+            }
+            var placement = new Placement(
+                new Vector3Int(coordinates.x, coordinates.y, coordinates.z - blockObjectSpec.BaseZ),
+                orientation, FlipMode.Unflipped);
+            Vector3Int entrance = blockObjectSpec.GetBlocks()
+                .Transform(blockObjectSpec.Entrance.Coordinates, placement);
+            Direction2D direction = orientation.Transform(Direction2D.Down);
+            return entrance - direction.ToOffset();
+        }
+
         public List<string> ListTemplateNames()
         {
             var names = new List<string>();

@@ -94,7 +94,7 @@ namespace TimberbornAutopilot.Planning
             string lastError = null;
             foreach (string candidate in goal.TemplateCandidates)
             {
-                if (TryPlaceNear(candidate, target, goal.SearchRadius,
+                if (TryPlaceNear(candidate, target, goal.SearchRadius, networkRoot,
                                  out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
@@ -130,8 +130,9 @@ namespace TimberbornAutopilot.Planning
             return false;
         }
 
-        /// <summary>Spiral search for a valid placement, trying all orientations.</summary>
-        private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius,
+        /// <summary>Spiral search for a valid placement whose doorstep is reachable
+        /// from the path network, trying all orientations.</summary>
+        private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius, Vector3Int networkRoot,
                                   out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
             foreach (Vector3Int tile in Spiral(anchor, radius))
@@ -142,6 +143,11 @@ namespace TimberbornAutopilot.Planning
                 foreach (Orientation orientation in Orientations)
                 {
                     if (!_buildPlacer.CanPlace(templateName, coords, orientation))
+                    {
+                        continue;
+                    }
+                    Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
+                    if (doorstep.HasValue && !_pathRouter.CanReach(networkRoot, doorstep.Value))
                     {
                         continue;
                     }
