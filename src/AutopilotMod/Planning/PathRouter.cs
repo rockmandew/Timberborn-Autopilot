@@ -42,50 +42,75 @@ namespace TimberbornAutopilot.Planning
         {
             Vector3Int start = SurfaceTile(networkRoot);
             Vector3Int goal = SurfaceTile(target);
-            List<RouteStep> route = FindRoute(NetworkSeeds(networkRoot), goal);
             string span = $"from {start} to {goal}";
-            if (route == null)
+            var unplaceable = new HashSet<Vector3Int>();
+            int placed = 0, existing = 0;
+            // Replan around tiles that turn out to be unplaceable (bushes, debris)
+            // so a single bad tile never leaves a broken chain.
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                report = $"no route {span}";
-                return false;
-            }
-            int placed = 0, existing = 0, failed = 0;
-            string firstError = null;
-            foreach (RouteStep step in route)
-            {
-                if (step.IsStairs)
+                _blockedColumns = unplaceable.Count > 0 ? unplaceable : null;
+                List<RouteStep> route;
+                try
                 {
-                    if (HasStairsAt(step.Tile))
+                    route = FindRoute(NetworkSeeds(networkRoot), goal);
+                }
+                finally
+                {
+                    _blockedColumns = null;
+                }
+                if (route == null)
+                {
+                    report = attempt == 0 ? $"no route {span}" : $"partial route {span} ({placed} placed)";
+                    return attempt > 0;
+                }
+                // The door tile itself must carry a path — never stop short.
+                if (route.Count == 0 || route[route.Count - 1].Tile != goal)
+                {
+                    route.Add(new RouteStep(goal, false, Orientation.Cw0));
+                }
+                int failed = 0;
+                foreach (RouteStep step in route)
+                {
+                    if (step.IsStairs)
+                    {
+                        if (HasStairsAt(step.Tile))
+                        {
+                            existing++;
+                        }
+                        else if (_buildPlacer.TryPlace("Stairs", step.Tile, step.StairsOrientation,
+                                                       Priority.Normal, out _))
+                        {
+                            placed++;
+                        }
+                        else
+                        {
+                            failed++;
+                            unplaceable.Add(new Vector3Int(step.Tile.x, step.Tile.y, 0));
+                        }
+                    }
+                    else if (_blockService.GetPathObjectAt(step.Tile) != null)
                     {
                         existing++;
                     }
-                    else if (_buildPlacer.TryPlace("Stairs", step.Tile, step.StairsOrientation,
-                                                   Priority.Normal, out string stairsError))
+                    else if (_buildPlacer.TryPlacePath(step.Tile, out _))
                     {
                         placed++;
                     }
-                    else
+                    else if (step.Tile != goal)
                     {
                         failed++;
-                        firstError = firstError ?? stairsError;
+                        unplaceable.Add(new Vector3Int(step.Tile.x, step.Tile.y, 0));
                     }
                 }
-                else if (_blockService.GetPathObjectAt(step.Tile) != null)
+                if (failed == 0)
                 {
-                    existing++;
-                }
-                else if (_buildPlacer.TryPlacePath(step.Tile, out string pathError))
-                {
-                    placed++;
-                }
-                else
-                {
-                    failed++;
-                    firstError = firstError ?? pathError;
+                    report = $"route {span}: {placed} placed, {existing} existing" +
+                             (attempt > 0 ? $" (rerouted around {unplaceable.Count} blocked tiles)" : "");
+                    return true;
                 }
             }
-            report = $"route {span}, {route.Count} tiles: {placed} placed, {existing} existing, {failed} failed" +
-                     (firstError != null ? $" (first failure: {firstError})" : "");
+            report = $"route {span} still has gaps after rerouting ({placed} placed)";
             return true;
         }
 
