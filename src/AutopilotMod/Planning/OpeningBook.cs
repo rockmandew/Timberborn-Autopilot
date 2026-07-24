@@ -181,6 +181,7 @@ namespace TimberbornAutopilot.Planning
                                   out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
             List<Vector3Int> existingDoorsteps = _worldQuery.BuildingDoorsteps();
+            int rejectedCanPlace = 0, rejectedWallIn = 0, rejectedOwnDoor = 0, rejectedReach = 0;
             foreach (Vector3Int tile in Spiral(anchor, radius))
             {
                 int height = _terrainService.GetTerrainHeightBelow(
@@ -195,6 +196,7 @@ namespace TimberbornAutopilot.Planning
                 {
                     if (!_buildPlacer.CanPlace(templateName, coords, orientation))
                     {
+                        rejectedCanPlace++;
                         continue;
                     }
                     HashSet<Vector3Int> footprint =
@@ -202,6 +204,7 @@ namespace TimberbornAutopilot.Planning
                     // Never wall in an existing building's door.
                     if (CoversAnyDoorstep(footprint, existingDoorsteps))
                     {
+                        rejectedWallIn++;
                         continue;
                     }
                     Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
@@ -210,9 +213,14 @@ namespace TimberbornAutopilot.Planning
                         Vector3Int doorColumn = new Vector3Int(doorstep.Value.x, doorstep.Value.y, 0);
                         // Own footprint must not sit on its own door, and the door
                         // must be reachable around (not through) the new body.
-                        if (footprint.Contains(doorColumn) ||
-                            !_pathRouter.CanReach(networkRoot, doorstep.Value, footprint))
+                        if (footprint.Contains(doorColumn))
                         {
+                            rejectedOwnDoor++;
+                            continue;
+                        }
+                        if (!_pathRouter.CanReach(networkRoot, doorstep.Value, footprint))
+                        {
+                            rejectedReach++;
                             continue;
                         }
                     }
@@ -230,6 +238,12 @@ namespace TimberbornAutopilot.Planning
                         return false;
                     }
                 }
+            }
+            if (lastError == null)
+            {
+                lastError = $"rejections: canPlace={rejectedCanPlace}, wallIn={rejectedWallIn}, " +
+                            $"ownDoor={rejectedOwnDoor}, reach={rejectedReach}";
+                _brainLog.Note($"{templateName} site search failed — {lastError}");
             }
             placedAt = default;
             entrance = null;
