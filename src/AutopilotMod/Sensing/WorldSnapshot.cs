@@ -8,6 +8,12 @@ namespace TimberbornAutopilot.Sensing
     /// </summary>
     public class WorldSnapshot
     {
+        // Campaign
+        public string Faction;
+        public string Objective;
+        public bool IronTeethUnlocked;
+        public int WellbeingUnlockTarget;
+
         // Time
         public int Cycle;
         public int CycleDay;

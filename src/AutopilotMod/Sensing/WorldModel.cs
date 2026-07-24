@@ -9,6 +9,7 @@ using Timberborn.ScienceSystem;
 using Timberborn.TimeSystem;
 using Timberborn.WeatherSystem;
 using Timberborn.Wellbeing;
+using TimberbornAutopilot.Planning;
 
 namespace TimberbornAutopilot.Sensing
 {
@@ -32,6 +33,7 @@ namespace TimberbornAutopilot.Sensing
         private readonly ScienceService _scienceService;
         private readonly ResourceCountingService _resourceCountingService;
         private readonly IGoodService _goodService;
+        private readonly CampaignPlanner _campaignPlanner;
 
         private List<string> _foodGoodIds;
         private List<string> _waterGoodIds;
@@ -44,7 +46,8 @@ namespace TimberbornAutopilot.Sensing
                           WellbeingService wellbeingService,
                           ScienceService scienceService,
                           ResourceCountingService resourceCountingService,
-                          IGoodService goodService)
+                          IGoodService goodService,
+                          CampaignPlanner campaignPlanner)
         {
             _gameCycleService = gameCycleService;
             _dayNightCycle = dayNightCycle;
@@ -55,17 +58,27 @@ namespace TimberbornAutopilot.Sensing
             _scienceService = scienceService;
             _resourceCountingService = resourceCountingService;
             _goodService = goodService;
+            _campaignPlanner = campaignPlanner;
         }
 
         public WorldSnapshot Snapshot()
         {
             ClassifyGoodsOnce();
             var snapshot = new WorldSnapshot();
+            ReadCampaign(snapshot);
             ReadTimeAndWeather(snapshot);
             ReadPopulation(snapshot);
             ReadEconomy(snapshot);
             ComputeSurvivalMath(snapshot);
             return snapshot;
+        }
+
+        private void ReadCampaign(WorldSnapshot s)
+        {
+            s.Faction = _campaignPlanner.CurrentFactionId;
+            s.Objective = _campaignPlanner.Objective.ToString();
+            s.IronTeethUnlocked = _campaignPlanner.IronTeethUnlocked;
+            s.WellbeingUnlockTarget = _campaignPlanner.WellbeingUnlockTarget;
         }
 
         private void ReadTimeAndWeather(WorldSnapshot s)

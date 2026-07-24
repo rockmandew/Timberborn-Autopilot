@@ -3,6 +3,7 @@ using Timberborn.GameCycleSystem;
 using Timberborn.HttpApiSystem;
 using Timberborn.SingletonSystem;
 using Timberborn.TickSystem;
+using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
 using UnityEngine;
 
@@ -18,12 +19,15 @@ namespace TimberbornAutopilot
         private readonly EventBus _eventBus;
         private readonly WorldModel _worldModel;
         private readonly HttpApi _httpApi;
+        private readonly CampaignPlanner _campaignPlanner;
 
-        public AutopilotService(EventBus eventBus, WorldModel worldModel, HttpApi httpApi)
+        public AutopilotService(EventBus eventBus, WorldModel worldModel, HttpApi httpApi,
+                                CampaignPlanner campaignPlanner)
         {
             _eventBus = eventBus;
             _worldModel = worldModel;
             _httpApi = httpApi;
+            _campaignPlanner = campaignPlanner;
         }
 
         public void Load()
@@ -60,7 +64,7 @@ namespace TimberbornAutopilot
                 $"[Autopilot] C{s.Cycle}D{s.CycleDay} | pop {s.Adults}+{s.Children}k+{s.Bots}b " +
                 $"wb {s.AverageWellbeing} | water {s.WaterStock} ({s.WaterDaysLeft:F1}d, need {s.WaterTargetForHazard:F0}) | " +
                 $"food {s.FoodStock} ({s.FoodDaysLeft:F1}d, need {s.FoodTargetForHazard:F0}) | " +
-                $"sci {s.SciencePoints} | {hazard} | {topStocks}");
+                $"sci {s.SciencePoints} | {hazard} | {topStocks} | {_campaignPlanner.DescribeProgress()}");
         }
     }
 }
