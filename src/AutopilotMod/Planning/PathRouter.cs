@@ -40,10 +40,13 @@ namespace TimberbornAutopilot.Planning
         /// and stairs. Returns false when no route exists.</summary>
         public bool Connect(Vector3Int networkRoot, Vector3Int target, out string report)
         {
-            List<RouteStep> route = FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target));
+            Vector3Int start = SurfaceTile(networkRoot);
+            Vector3Int goal = SurfaceTile(target);
+            List<RouteStep> route = FindRoute(NetworkSeeds(networkRoot), goal);
+            string span = $"from {start} to {goal}";
             if (route == null)
             {
-                report = "no route";
+                report = $"no route {span}";
                 return false;
             }
             int placed = 0, existing = 0, failed = 0;
@@ -81,7 +84,7 @@ namespace TimberbornAutopilot.Planning
                     firstError = firstError ?? pathError;
                 }
             }
-            report = $"route {route.Count} tiles: {placed} placed, {existing} existing, {failed} failed" +
+            report = $"route {span}, {route.Count} tiles: {placed} placed, {existing} existing, {failed} failed" +
                      (firstError != null ? $" (first failure: {firstError})" : "");
             return true;
         }
