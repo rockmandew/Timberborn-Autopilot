@@ -165,7 +165,12 @@ namespace TimberbornAutopilot.Acting
                 orientation, FlipMode.Unflipped);
             foreach (Block block in blockObjectSpec.GetBlocks(placement))
             {
-                columns.Add(new Vector3Int(block.Coordinates.x, block.Coordinates.y, 0));
+                // Entrance/access marker blocks are not solid — only physically
+                // occupied blocks wall things in or block walking.
+                if (block.IsOccupied)
+                {
+                    columns.Add(new Vector3Int(block.Coordinates.x, block.Coordinates.y, 0));
+                }
             }
             return columns;
         }
