@@ -57,11 +57,13 @@ namespace TimberbornAutopilot.Planning
                 return;
             }
             Vector3Int? districtCenter = _worldQuery.DistrictCenterCoordinates();
-            if (!districtCenter.HasValue)
+            Vector3Int? doorstep = _worldQuery.DistrictCenterDoorstep();
+            if (!districtCenter.HasValue || !doorstep.HasValue)
             {
                 return;
             }
             Vector3Int anchor = districtCenter.Value;
+            Vector3Int networkRoot = doorstep.Value;
             WorldSnapshot world = _worldModel.Snapshot();
 
             foreach (Goal goal in BuildGoals(world, anchor))
@@ -75,18 +77,18 @@ namespace TimberbornAutopilot.Planning
                 {
                     _brainLog.Announce(goal.Intent);
                 }
-                if (ExecuteGoal(goal, anchor, world))
+                if (ExecuteGoal(goal, anchor, networkRoot, world))
                 {
                     return;
                 }
                 // Goal can't act right now (science, no spot) — let later goals proceed.
             }
 
-            RepairConnectivity(anchor);
+            RepairConnectivity(networkRoot);
             CheckSuggestions(world);
         }
 
-        private bool ExecuteGoal(Goal goal, Vector3Int anchor, WorldSnapshot world)
+        private bool ExecuteGoal(Goal goal, Vector3Int anchor, Vector3Int networkRoot, WorldSnapshot world)
         {
             Vector3Int target = goal.Anchor ?? anchor;
             string lastError = null;
@@ -96,9 +98,17 @@ namespace TimberbornAutopilot.Planning
                                  out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
-                    if (_pathRouter.Connect(anchor, entrance ?? placedAt, out int tiles) && tiles > 0)
+                    if (_pathRouter.Connect(networkRoot, entrance ?? placedAt, out int tiles))
                     {
-                        _brainLog.Note($"Routed {tiles} path tiles to the new {candidate}.");
+                        if (tiles > 0)
+                        {
+                            _brainLog.Note($"Routed {tiles} path tiles to the new {candidate}.");
+                        }
+                    }
+                    else
+                    {
+                        _brainLog.Suggest($"No flat route to the new {candidate} at " +
+                                          $"({placedAt.x},{placedAt.y}) — it may need stairs or a bridge.");
                     }
                     goal.OnPlaced?.Invoke(placedAt);
                     return true;
@@ -155,20 +165,29 @@ namespace TimberbornAutopilot.Planning
             return false;
         }
 
-        /// <summary>One building per pass: if it has no adjacent path anywhere around
-        /// its footprint tile, route one. Fixes player-placed and pre-fix buildings.</summary>
-        private void RepairConnectivity(Vector3Int anchor)
+        /// <summary>One building per pass: route the path network to its doorstep.
+        /// Fixes player-placed and pre-fix buildings. Routing is idempotent, so
+        /// re-checking a connected doorstep costs nothing and places nothing.</summary>
+        private void RepairConnectivity(Vector3Int networkRoot)
         {
-            foreach (Vector3Int building in _worldQuery.BuildingCoordinates())
+            foreach (Vector3Int doorstep in _worldQuery.BuildingDoorsteps())
             {
-                if (building == anchor || !_connectivityChecked.Add(building))
+                if (!_connectivityChecked.Add(doorstep))
                 {
                     continue;
                 }
-                if (_pathRouter.Connect(anchor, building, out int tiles) && tiles > 0)
+                if (_pathRouter.Connect(networkRoot, doorstep, out int tiles))
                 {
-                    _brainLog.Note($"Connected building at ({building.x},{building.y}) " +
-                                   $"with {tiles} path tiles.");
+                    if (tiles > 0)
+                    {
+                        _brainLog.Note($"Connected doorstep at ({doorstep.x},{doorstep.y}) " +
+                                       $"with {tiles} path tiles.");
+                    }
+                }
+                else if (_givenSuggestions.Add($"no-route-{doorstep.x}-{doorstep.y}"))
+                {
+                    _brainLog.Suggest($"Building at ({doorstep.x},{doorstep.y}) has no flat route " +
+                                      "to the district — it may need stairs, or consider relocating it.");
                 }
                 return;
             }

@@ -85,10 +85,9 @@ namespace TimberbornAutopilot.Acting
                 {
                     OnPlaced(placed, builderPriority);
                     var blockObject = placed.GetComponent<BlockObject>();
-                    if (blockObject != null && blockObjectSpec.Entrance != null &&
-                        blockObjectSpec.Entrance.HasEntrance)
+                    if (blockObject != null && blockObject.HasEntrance)
                     {
-                        entrance = blockObject.TransformCoordinates(blockObjectSpec.Entrance.Coordinates);
+                        entrance = blockObject.PositionedEntrance.DoorstepCoordinates;
                     }
                 });
             entranceTile = entrance;

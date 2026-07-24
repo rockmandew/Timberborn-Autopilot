@@ -41,19 +41,28 @@ namespace TimberbornAutopilot.Planning
             return count;
         }
 
-        /// <summary>Coordinates of all buildings (any state), for connectivity repair.</summary>
-        public List<Vector3Int> BuildingCoordinates()
+        /// <summary>Doorstep (or origin) of every building except paths and the
+        /// district center — the tiles the path network must reach.</summary>
+        public List<Vector3Int> BuildingDoorsteps()
         {
-            var coordinates = new List<Vector3Int>();
+            Vector3Int? districtCenter = DistrictCenterCoordinates();
+            var doorsteps = new List<Vector3Int>();
             foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
             {
-                var blockObject = building.GetComponent<BlockObject>();
-                if (blockObject != null)
+                if (building.GameObject.name.StartsWith("Path"))
                 {
-                    coordinates.Add(blockObject.Coordinates);
+                    continue;
                 }
+                var blockObject = building.GetComponent<BlockObject>();
+                if (blockObject == null || blockObject.Coordinates == districtCenter)
+                {
+                    continue;
+                }
+                doorsteps.Add(blockObject.HasEntrance
+                    ? blockObject.PositionedEntrance.DoorstepCoordinates
+                    : blockObject.Coordinates);
             }
-            return coordinates;
+            return doorsteps;
         }
 
         public Vector3Int? DistrictCenterCoordinates()
@@ -61,6 +70,21 @@ namespace TimberbornAutopilot.Planning
             foreach (DistrictCenter districtCenter in _districtCenterRegistry.AllDistrictCenters)
             {
                 return districtCenter.GetComponent<BlockObject>().Coordinates;
+            }
+            return null;
+        }
+
+        /// <summary>The district center's doorstep — the root of the path network.</summary>
+        public Vector3Int? DistrictCenterDoorstep()
+        {
+            foreach (DistrictCenter districtCenter in _districtCenterRegistry.AllDistrictCenters)
+            {
+                var blockObject = districtCenter.GetComponent<BlockObject>();
+                if (blockObject.HasEntrance)
+                {
+                    return blockObject.PositionedEntrance.DoorstepCoordinates;
+                }
+                return blockObject.Coordinates;
             }
             return null;
         }

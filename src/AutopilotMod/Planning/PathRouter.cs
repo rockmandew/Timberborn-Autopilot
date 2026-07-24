@@ -28,13 +28,14 @@ namespace TimberbornAutopilot.Planning
             _buildPlacer = buildPlacer;
         }
 
-        /// <summary>Routes a path from near the district center to a tile adjacent
-        /// to the target, placing path construction sites along the way.
+        /// <summary>Routes a path from the EXISTING path network (seeded from the
+        /// district doorstep and every path tile near it) to the target doorstep.
         /// Returns false when no flat walkable route exists.</summary>
-        public bool Connect(Vector3Int from, Vector3Int target, out int tilesPlaced)
+        public bool Connect(Vector3Int networkRoot, Vector3Int target, out int tilesPlaced)
         {
             tilesPlaced = 0;
-            List<Vector3Int> route = FindRoute(SurfaceTile(from), SurfaceTile(target));
+            List<Vector3Int> seeds = NetworkSeeds(networkRoot);
+            List<Vector3Int> route = FindRoute(seeds, SurfaceTile(target));
             if (route == null)
             {
                 return false;
@@ -50,12 +51,38 @@ namespace TimberbornAutopilot.Planning
             return true;
         }
 
-        private List<Vector3Int> FindRoute(Vector3Int start, Vector3Int goal)
+        /// <summary>The district doorstep plus every existing path tile around it —
+        /// guaranteed entry points into the real walkable network.</summary>
+        private List<Vector3Int> NetworkSeeds(Vector3Int networkRoot)
+        {
+            var seeds = new List<Vector3Int> { SurfaceTile(networkRoot) };
+            for (int dx = -14; dx <= 14; dx++)
+            {
+                for (int dy = -14; dy <= 14; dy++)
+                {
+                    Vector3Int tile = SurfaceTile(new Vector3Int(networkRoot.x + dx, networkRoot.y + dy, 0));
+                    if (_blockService.GetPathObjectAt(tile) != null)
+                    {
+                        seeds.Add(tile);
+                    }
+                }
+            }
+            return seeds;
+        }
+
+        private List<Vector3Int> FindRoute(List<Vector3Int> seeds, Vector3Int goal)
         {
             var cameFrom = new Dictionary<Vector3Int, Vector3Int>();
             var queue = new Queue<Vector3Int>();
-            var visited = new HashSet<Vector3Int> { start };
-            queue.Enqueue(start);
+            var visited = new HashSet<Vector3Int>();
+            var seedSet = new HashSet<Vector3Int>(seeds);
+            foreach (Vector3Int seed in seeds)
+            {
+                if (visited.Add(seed))
+                {
+                    queue.Enqueue(seed);
+                }
+            }
             int examined = 0;
 
             while (queue.Count > 0 && examined++ < MaxSearchNodes)
@@ -70,7 +97,7 @@ namespace TimberbornAutopilot.Planning
                     if (IsAdjacent(next, goal) || next == goal)
                     {
                         cameFrom[next] = current;
-                        return Reconstruct(cameFrom, start, next);
+                        return Reconstruct(cameFrom, seedSet, next);
                     }
                     if (!IsWalkable(next) || next.z != current.z)
                     {
@@ -114,11 +141,11 @@ namespace TimberbornAutopilot.Planning
         }
 
         private static List<Vector3Int> Reconstruct(Dictionary<Vector3Int, Vector3Int> cameFrom,
-                                                    Vector3Int start, Vector3Int end)
+                                                    HashSet<Vector3Int> seeds, Vector3Int end)
         {
             var route = new List<Vector3Int> { end };
             Vector3Int current = end;
-            while (cameFrom.TryGetValue(current, out Vector3Int previous) && previous != start)
+            while (cameFrom.TryGetValue(current, out Vector3Int previous) && !seeds.Contains(previous))
             {
                 route.Add(previous);
                 current = previous;
