@@ -41,6 +41,21 @@ namespace TimberbornAutopilot.Planning
             return count;
         }
 
+        /// <summary>Coordinates of all buildings (any state), for connectivity repair.</summary>
+        public List<Vector3Int> BuildingCoordinates()
+        {
+            var coordinates = new List<Vector3Int>();
+            foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
+            {
+                var blockObject = building.GetComponent<BlockObject>();
+                if (blockObject != null)
+                {
+                    coordinates.Add(blockObject.Coordinates);
+                }
+            }
+            return coordinates;
+        }
+
         public Vector3Int? DistrictCenterCoordinates()
         {
             foreach (DistrictCenter districtCenter in _districtCenterRegistry.AllDistrictCenters)

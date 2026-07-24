@@ -23,9 +23,11 @@ namespace TimberbornAutopilot.Planning
         private readonly WorldModel _worldModel;
         private readonly BrainLog _brainLog;
         private readonly ITerrainService _terrainService;
+        private readonly PathRouter _pathRouter;
 
         private readonly HashSet<string> _announcedGoals = new HashSet<string>();
         private readonly HashSet<string> _givenSuggestions = new HashSet<string>();
+        private readonly HashSet<Vector3Int> _connectivityChecked = new HashSet<Vector3Int>();
 
         public bool Enabled { get; set; } = true;
 
@@ -34,7 +36,8 @@ namespace TimberbornAutopilot.Planning
                            WorldQuery worldQuery,
                            WorldModel worldModel,
                            BrainLog brainLog,
-                           ITerrainService terrainService)
+                           ITerrainService terrainService,
+                           PathRouter pathRouter)
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
@@ -42,6 +45,7 @@ namespace TimberbornAutopilot.Planning
             _worldModel = worldModel;
             _brainLog = brainLog;
             _terrainService = terrainService;
+            _pathRouter = pathRouter;
         }
 
         /// <summary>One planning pass: find the first unsatisfied goal and take
@@ -71,35 +75,54 @@ namespace TimberbornAutopilot.Planning
                 {
                     _brainLog.Announce(goal.Intent);
                 }
-                ExecuteGoal(goal, anchor);
-                return;
+                if (ExecuteGoal(goal, anchor, world))
+                {
+                    return;
+                }
+                // Goal can't act right now (science, no spot) — let later goals proceed.
             }
 
+            RepairConnectivity(anchor);
             CheckSuggestions(world);
         }
 
-        private void ExecuteGoal(Goal goal, Vector3Int anchor)
+        private bool ExecuteGoal(Goal goal, Vector3Int anchor, WorldSnapshot world)
         {
             Vector3Int target = goal.Anchor ?? anchor;
+            string lastError = null;
             foreach (string candidate in goal.TemplateCandidates)
             {
-                if (TryPlaceNear(candidate, target, goal.SearchRadius, out Vector3Int placedAt))
+                if (TryPlaceNear(candidate, target, goal.SearchRadius,
+                                 out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
-                    BuildPathToward(anchor, placedAt);
+                    if (_pathRouter.Connect(anchor, entrance ?? placedAt, out int tiles) && tiles > 0)
+                    {
+                        _brainLog.Note($"Routed {tiles} path tiles to the new {candidate}.");
+                    }
                     goal.OnPlaced?.Invoke(placedAt);
-                    return;
+                    return true;
                 }
             }
-            if (_givenSuggestions.Add("cannot-place-" + goal.Key))
+            if (lastError != null && lastError.Contains("science"))
+            {
+                if (_givenSuggestions.Add($"science-{goal.Key}-c{world.Cycle}d{world.CycleDay}"))
+                {
+                    _brainLog.Note($"{goal.TemplateCandidates[0]} is waiting on science " +
+                                   $"({lastError}). Moving down the list meanwhile.");
+                }
+            }
+            else if (_givenSuggestions.Add("cannot-place-" + goal.Key))
             {
                 _brainLog.Suggest($"I couldn't find a valid spot for {goal.TemplateCandidates[0]} " +
                                   $"near ({target.x},{target.y}) — feel free to place one manually.");
             }
+            return false;
         }
 
         /// <summary>Spiral search for a valid placement, trying all orientations.</summary>
-        private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius, out Vector3Int placedAt)
+        private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius,
+                                  out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
             foreach (Vector3Int tile in Spiral(anchor, radius))
             {
@@ -108,27 +131,46 @@ namespace TimberbornAutopilot.Planning
                 var coords = new Vector3Int(tile.x, tile.y, height);
                 foreach (Orientation orientation in Orientations)
                 {
-                    if (_buildPlacer.CanPlace(templateName, coords, orientation) &&
-                        _buildPlacer.TryPlace(templateName, coords, orientation, Priority.Normal, out _))
+                    if (!_buildPlacer.CanPlace(templateName, coords, orientation))
+                    {
+                        continue;
+                    }
+                    if (_buildPlacer.TryPlace(templateName, coords, orientation, Priority.Normal,
+                                              out string error, out entrance))
                     {
                         placedAt = coords;
                         return true;
                     }
+                    lastError = error;
+                    if (error != null && (error.Contains("science") || error.Contains("Unknown")))
+                    {
+                        placedAt = default;
+                        entrance = null;
+                        return false;
+                    }
                 }
             }
             placedAt = default;
+            entrance = null;
             return false;
         }
 
-        /// <summary>L-shaped path on flat terrain from the district toward a building.
-        /// Tiles that fail (occupied, slope) are skipped — a path already there is fine.</summary>
-        private void BuildPathToward(Vector3Int from, Vector3Int to)
+        /// <summary>One building per pass: if it has no adjacent path anywhere around
+        /// its footprint tile, route one. Fixes player-placed and pre-fix buildings.</summary>
+        private void RepairConnectivity(Vector3Int anchor)
         {
-            foreach (Vector3Int tile in LRoute(from, to))
+            foreach (Vector3Int building in _worldQuery.BuildingCoordinates())
             {
-                int height = _terrainService.GetTerrainHeightBelow(
-                    new Vector3Int(tile.x, tile.y, _terrainService.Size.z - 1));
-                _buildPlacer.TryPlacePath(new Vector3Int(tile.x, tile.y, height), out _);
+                if (building == anchor || !_connectivityChecked.Add(building))
+                {
+                    continue;
+                }
+                if (_pathRouter.Connect(anchor, building, out int tiles) && tiles > 0)
+                {
+                    _brainLog.Note($"Connected building at ({building.x},{building.y}) " +
+                                   $"with {tiles} path tiles.");
+                }
+                return;
             }
         }
 
@@ -151,19 +193,19 @@ namespace TimberbornAutopilot.Planning
                 new Goal("log-pile", new[] { "SmallPile" }, 1, 12,
                     "Adding a Small Pile — logs need a home near the lumberjacks.")
                     { Anchor = trees },
+                new Goal("inventor", new[] { "Inventor" }, 1, 15,
+                    "Building an Inventor — science income unlocks the whole tech ladder."),
                 new Goal("farm", new[] { "EfficientFarmHouse" }, 1, 18,
                     "Building a Farmhouse — carrots are the fastest calories per tile.")
                     { OnPlaced = ZoneCarrotsAround },
                 new Goal("warehouse", new[] { "SmallWarehouse" }, 1, 12,
                     "Adding a Small Warehouse — food storage before the first drought."),
-                new Goal("forester", new[] { "Forester" }, 1, 15,
-                    "Adding a Forester — replanted trees prevent the mid-game wood crisis.")
-                    { OnPlaced = ZoneTreesAround },
                 new Goal("water-tank", new[] { "SmallTank" }, 2, 15,
                     $"Building water storage — the {world.NextHazard} needs " +
                     $"{world.WaterTargetForHazard:F0} water banked."),
-                new Goal("inventor", new[] { "Inventor" }, 1, 15,
-                    "Building an Inventor — science unlocks everything on the wellbeing ladder."),
+                new Goal("forester", new[] { "Forester" }, 1, 15,
+                    "Adding a Forester — replanted trees prevent the mid-game wood crisis.")
+                    { OnPlaced = ZoneTreesAround },
                 new Goal("housing", new[] { "Lodge" }, world.Homeless > 0 ? 2 : 1, 15,
                     "Adding a Lodge — rested beavers work faster, and shared housing means kits."),
                 new Goal("campfire", new[] { "Campfire" }, 1, 12,
@@ -235,22 +277,6 @@ namespace TimberbornAutopilot.Planning
                     yield return new Vector3Int(center.x - ring, center.y + i, 0);
                     yield return new Vector3Int(center.x + ring, center.y + i, 0);
                 }
-            }
-        }
-
-        private static IEnumerable<Vector3Int> LRoute(Vector3Int from, Vector3Int to)
-        {
-            int stepX = Math.Sign(to.x - from.x);
-            for (int x = from.x; x != to.x; x += stepX == 0 ? 1 : stepX)
-            {
-                if (stepX == 0) break;
-                yield return new Vector3Int(x, from.y, 0);
-            }
-            int stepY = Math.Sign(to.y - from.y);
-            for (int y = from.y; y != to.y; y += stepY == 0 ? 1 : stepY)
-            {
-                if (stepY == 0) break;
-                yield return new Vector3Int(to.x, y, 0);
             }
         }
 

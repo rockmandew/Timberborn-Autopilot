@@ -15,6 +15,7 @@ namespace TimberbornAutopilot
             containerDefinition.Bind<CampaignPlanner>().AsSingleton();
             containerDefinition.Bind<BrainLog>().AsSingleton();
             containerDefinition.Bind<WorldQuery>().AsSingleton();
+            containerDefinition.Bind<PathRouter>().AsSingleton();
             containerDefinition.Bind<OpeningBook>().AsSingleton();
             containerDefinition.Bind<WorldModel>().AsSingleton();
             containerDefinition.Bind<MapSurveyor>().AsSingleton();

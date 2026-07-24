@@ -50,6 +50,13 @@ namespace TimberbornAutopilot.Acting
         public bool TryPlace(string templateName, Vector3Int coordinates, Orientation orientation,
                              Priority builderPriority, out string error)
         {
+            return TryPlace(templateName, coordinates, orientation, builderPriority, out error, out _);
+        }
+
+        public bool TryPlace(string templateName, Vector3Int coordinates, Orientation orientation,
+                             Priority builderPriority, out string error, out Vector3Int? entranceTile)
+        {
+            entranceTile = null;
             BuildingSpec buildingSpec = ResolveTemplate(templateName);
             if (buildingSpec == null)
             {
@@ -72,8 +79,19 @@ namespace TimberbornAutopilot.Acting
                 return false;
             }
 
+            Vector3Int? entrance = null;
             _blockObjectPlacerService.GetMatchingPlacer(blockObjectSpec)
-                .Place(blockObjectSpec, placement, placed => OnPlaced(placed, builderPriority));
+                .Place(blockObjectSpec, placement, placed =>
+                {
+                    OnPlaced(placed, builderPriority);
+                    var blockObject = placed.GetComponent<BlockObject>();
+                    if (blockObject != null && blockObjectSpec.Entrance != null &&
+                        blockObjectSpec.Entrance.HasEntrance)
+                    {
+                        entrance = blockObject.TransformCoordinates(blockObjectSpec.Entrance.Coordinates);
+                    }
+                });
+            entranceTile = entrance;
             error = null;
             return true;
         }
