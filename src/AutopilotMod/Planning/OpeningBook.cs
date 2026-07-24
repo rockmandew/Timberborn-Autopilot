@@ -213,14 +213,10 @@ namespace TimberbornAutopilot.Planning
                     Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
                     if (doorstep.HasValue)
                     {
+                        // For flags and similar, the door tile IS the building tile —
+                        // keep it approachable, block only the rest of the body.
                         Vector3Int doorColumn = new Vector3Int(doorstep.Value.x, doorstep.Value.y, 0);
-                        // Own footprint must not sit on its own door, and the door
-                        // must be reachable around (not through) the new body.
-                        if (footprint.Contains(doorColumn))
-                        {
-                            rejectedOwnDoor++;
-                            continue;
-                        }
+                        footprint.Remove(doorColumn);
                         if (!_pathRouter.CanReach(networkRoot, doorstep.Value, footprint))
                         {
                             rejectedReach++;
