@@ -144,7 +144,7 @@ namespace TimberbornAutopilot.Planning
 
         private static bool IsAdjacent(Vector3Int a, Vector3Int b)
         {
-            return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) <= 1;
+            return a.z == b.z && Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) <= 1;
         }
 
         private static List<Vector3Int> Reconstruct(Dictionary<Vector3Int, Vector3Int> cameFrom,

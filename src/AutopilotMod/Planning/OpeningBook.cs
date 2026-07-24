@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Timberborn.Coordinates;
 using Timberborn.PrioritySystem;
 using Timberborn.TerrainSystem;
+using Timberborn.WaterSystem;
 using TimberbornAutopilot.Acting;
 using TimberbornAutopilot.Sensing;
 using UnityEngine;
@@ -24,6 +25,7 @@ namespace TimberbornAutopilot.Planning
         private readonly BrainLog _brainLog;
         private readonly ITerrainService _terrainService;
         private readonly PathRouter _pathRouter;
+        private readonly IThreadSafeWaterMap _waterMap;
 
         private readonly HashSet<string> _announcedGoals = new HashSet<string>();
         private readonly HashSet<string> _givenSuggestions = new HashSet<string>();
@@ -37,7 +39,8 @@ namespace TimberbornAutopilot.Planning
                            WorldModel worldModel,
                            BrainLog brainLog,
                            ITerrainService terrainService,
-                           PathRouter pathRouter)
+                           PathRouter pathRouter,
+                           IThreadSafeWaterMap waterMap)
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
@@ -46,6 +49,7 @@ namespace TimberbornAutopilot.Planning
             _brainLog = brainLog;
             _terrainService = terrainService;
             _pathRouter = pathRouter;
+            _waterMap = waterMap;
         }
 
         /// <summary>One planning pass: find the first unsatisfied goal and take
@@ -88,13 +92,38 @@ namespace TimberbornAutopilot.Planning
             CheckSuggestions(world);
         }
 
+        /// <summary>A tile qualifies for water buildings when any neighboring column
+        /// holds actual water — pumps placed inland pump nothing.</summary>
+        private bool TouchesWater(Vector3Int coords)
+        {
+            var offsets = new[]
+            {
+                new Vector3Int(1, 0, 0), new Vector3Int(-1, 0, 0),
+                new Vector3Int(0, 1, 0), new Vector3Int(0, -1, 0),
+                new Vector3Int(2, 0, 0), new Vector3Int(-2, 0, 0),
+                new Vector3Int(0, 2, 0), new Vector3Int(0, -2, 0),
+            };
+            foreach (Vector3Int offset in offsets)
+            {
+                Vector3Int column = coords + offset;
+                for (int z = 0; z <= coords.z; z++)
+                {
+                    if (_waterMap.WaterDepth(new Vector3Int(column.x, column.y, z)) > 0.1f)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private bool ExecuteGoal(Goal goal, Vector3Int anchor, Vector3Int networkRoot, WorldSnapshot world)
         {
             Vector3Int target = goal.Anchor ?? anchor;
             string lastError = null;
             foreach (string candidate in goal.TemplateCandidates)
             {
-                if (TryPlaceNear(candidate, target, goal.SearchRadius, networkRoot,
+                if (TryPlaceNear(candidate, target, goal.SearchRadius, networkRoot, goal.SiteFilter,
                                  out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
@@ -133,6 +162,7 @@ namespace TimberbornAutopilot.Planning
         /// <summary>Spiral search for a valid placement whose doorstep is reachable
         /// from the path network, trying all orientations.</summary>
         private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius, Vector3Int networkRoot,
+                                  Func<Vector3Int, bool> siteFilter,
                                   out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
             foreach (Vector3Int tile in Spiral(anchor, radius))
@@ -140,6 +170,10 @@ namespace TimberbornAutopilot.Planning
                 int height = _terrainService.GetTerrainHeightBelow(
                     new Vector3Int(tile.x, tile.y, _terrainService.Size.z - 1));
                 var coords = new Vector3Int(tile.x, tile.y, height);
+                if (siteFilter != null && !siteFilter(coords))
+                {
+                    continue;
+                }
                 foreach (Orientation orientation in Orientations)
                 {
                     if (!_buildPlacer.CanPlace(templateName, coords, orientation))
@@ -206,9 +240,9 @@ namespace TimberbornAutopilot.Planning
 
             var goals = new List<Goal>
             {
-                new Goal("water-pump", new[] { "WaterPump" }, 1, 25,
+                new Goal("water-pump", new[] { "WaterPump" }, 1, 30,
                     "Placing a Water Pump by the river — drinking water is survival priority #1.")
-                    { Anchor = null },
+                    { Anchor = null, SiteFilter = TouchesWater },
                 new Goal("lumberjacks", new[] { "LumberjackFlag" }, 2, 12,
                     "Adding Lumberjack Flags near the forest — logs fund everything early.")
                     { Anchor = trees },
@@ -314,6 +348,7 @@ namespace TimberbornAutopilot.Planning
             public string Intent { get; }
             public Vector3Int? Anchor { get; set; }
             public Action<Vector3Int> OnPlaced { get; set; }
+            public Func<Vector3Int, bool> SiteFilter { get; set; }
 
             public Goal(string key, string[] templateCandidates, int targetCount,
                         int searchRadius, string intent)
