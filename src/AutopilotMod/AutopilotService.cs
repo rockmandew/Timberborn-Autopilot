@@ -22,15 +22,19 @@ namespace TimberbornAutopilot
         private readonly HttpApi _httpApi;
         private readonly CampaignPlanner _campaignPlanner;
         private readonly AutopilotCommandEndpoint _commandEndpoint;
+        private readonly OpeningBook _openingBook;
+        private int _ticksSincePlanning;
 
         public AutopilotService(EventBus eventBus, WorldModel worldModel, HttpApi httpApi,
-                                CampaignPlanner campaignPlanner, AutopilotCommandEndpoint commandEndpoint)
+                                CampaignPlanner campaignPlanner, AutopilotCommandEndpoint commandEndpoint,
+                                OpeningBook openingBook)
         {
             _eventBus = eventBus;
             _worldModel = worldModel;
             _httpApi = httpApi;
             _campaignPlanner = campaignPlanner;
             _commandEndpoint = commandEndpoint;
+            _openingBook = openingBook;
         }
 
         public void Load()
@@ -45,7 +49,11 @@ namespace TimberbornAutopilot
 
         public void Tick()
         {
-            // Planner loop lands here in v0.5.
+            if (++_ticksSincePlanning >= 30)
+            {
+                _ticksSincePlanning = 0;
+                _openingBook.PlanningPass();
+            }
         }
 
         /// <summary>Runs every frame, even while the game is paused — remote

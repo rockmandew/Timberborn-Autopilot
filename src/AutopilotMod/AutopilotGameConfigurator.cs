@@ -13,6 +13,9 @@ namespace TimberbornAutopilot
         public void Configure(IContainerDefinition containerDefinition)
         {
             containerDefinition.Bind<CampaignPlanner>().AsSingleton();
+            containerDefinition.Bind<BrainLog>().AsSingleton();
+            containerDefinition.Bind<WorldQuery>().AsSingleton();
+            containerDefinition.Bind<OpeningBook>().AsSingleton();
             containerDefinition.Bind<WorldModel>().AsSingleton();
             containerDefinition.Bind<MapSurveyor>().AsSingleton();
             containerDefinition.Bind<BuildPlacer>().AsSingleton();

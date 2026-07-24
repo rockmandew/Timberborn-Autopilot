@@ -34,6 +34,8 @@ namespace TimberbornAutopilot.Http
         private readonly CrewManager _crewManager;
         private readonly SpeedController _speedController;
         private readonly MapSurveyor _mapSurveyor;
+        private readonly Planning.BrainLog _brainLog;
+        private readonly Planning.OpeningBook _openingBook;
 
         private readonly object _queueLock = new object();
         private readonly Queue<PendingCommand> _pending = new Queue<PendingCommand>();
@@ -42,13 +44,17 @@ namespace TimberbornAutopilot.Http
                                         ZonePlanner zonePlanner,
                                         CrewManager crewManager,
                                         SpeedController speedController,
-                                        MapSurveyor mapSurveyor)
+                                        MapSurveyor mapSurveyor,
+                                        Planning.BrainLog brainLog,
+                                        Planning.OpeningBook openingBook)
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
             _crewManager = crewManager;
             _speedController = speedController;
             _mapSurveyor = mapSurveyor;
+            _brainLog = brainLog;
+            _openingBook = openingBook;
         }
 
         /// <summary>Called by AutopilotService.Tick() on the main thread.</summary>
@@ -147,6 +153,16 @@ namespace TimberbornAutopilot.Http
                     return () => new { ok = _crewManager.TrySetDesiredWorkers(Coords(q), int.Parse(q["count"])) };
                 case "priority":
                     return () => new { ok = _crewManager.TrySetWorkplacePriority(Coords(q), ParsePriority(q["priority"])) };
+                case "brain":
+                    return () => new { auto = _openingBook.Enabled, messages = _brainLog.Recent };
+                case "auto":
+                    return () =>
+                    {
+                        _openingBook.Enabled = bool.Parse(q["enabled"] ?? "true");
+                        return new { ok = true, auto = _openingBook.Enabled };
+                    };
+                case "templates":
+                    return () => new { templates = _buildPlacer.ListTemplateNames() };
                 case "survey":
                     return () => _mapSurveyor.Survey(
                         TryParseInt(q["x"]), TryParseInt(q["y"]),

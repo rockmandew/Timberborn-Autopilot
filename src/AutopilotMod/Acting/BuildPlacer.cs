@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Timberborn.BaseComponentSystem;
 using Timberborn.BlockObjectTools;
 using Timberborn.BlockSystem;
@@ -105,6 +106,17 @@ namespace TimberbornAutopilot.Acting
                 return false;
             }
             return EnsureUnlocked(buildingSpec, out error);
+        }
+
+        public List<string> ListTemplateNames()
+        {
+            var names = new List<string>();
+            foreach (BuildingSpec buildingSpec in _buildingService.Buildings)
+            {
+                names.Add(_buildingService.GetTemplateName(buildingSpec));
+            }
+            names.Sort();
+            return names;
         }
 
         /// <summary>Resolves "WaterPump" -> "WaterPump.Folktails" when needed;
