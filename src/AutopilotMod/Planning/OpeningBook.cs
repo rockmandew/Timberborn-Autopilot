@@ -359,7 +359,7 @@ namespace TimberbornAutopilot.Planning
 
         private void MarkCuttingAreaAround(Vector3Int flag)
         {
-            List<Vector3Int> trees = _worldQuery.ResourceCoordinatesNear(flag, 7, gatherable: false);
+            List<Vector3Int> trees = _worldQuery.ResourceCoordinatesNear(flag, 12, gatherable: false);
             _zonePlanner.MarkTreeCoordinates(trees);
             _brainLog.Note($"Marked {trees.Count} trees around ({flag.x},{flag.y}) for cutting.");
         }
