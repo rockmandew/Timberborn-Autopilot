@@ -125,20 +125,10 @@ namespace TimberbornAutopilot.Planning
                     {
                         continue;
                     }
-                    if (next.z == goal.z && next == goal)
-                    {
-                        cameFrom[next] = current;
-                        entryDirection[next] = direction;
-                        return Reconstruct(cameFrom, entryDirection, seedSet, next);
-                    }
+                    // Validate the edge FIRST — a route may never end on an
+                    // illegal hop (e.g. straight off a cliff onto the doorstep).
                     if (dz == 0)
                     {
-                        if (next.z == goal.z && IsAdjacentFlat(next, goal))
-                        {
-                            cameFrom[next] = current;
-                            entryDirection[next] = direction;
-                            return Reconstruct(cameFrom, entryDirection, seedSet, next);
-                        }
                         if (!IsWalkable(next))
                         {
                             continue;
@@ -168,6 +158,12 @@ namespace TimberbornAutopilot.Planning
                     {
                         continue;
                     }
+                    if (next == goal || IsAdjacentFlat(next, goal))
+                    {
+                        cameFrom[next] = current;
+                        entryDirection[next] = direction;
+                        return Reconstruct(cameFrom, entryDirection, seedSet, next);
+                    }
                     visited.Add(next);
                     cameFrom[next] = current;
                     entryDirection[next] = direction;
@@ -189,7 +185,10 @@ namespace TimberbornAutopilot.Planning
             {
                 return true;
             }
-            return _buildPlacer.CanPlace("Stairs", lowerTile, OrientationFor(uphillDirection));
+            // Only count on stairs we can actually afford right now — planning
+            // around unaffordable stairs recreates the science deadlock.
+            return _buildPlacer.IsAvailable("Stairs") &&
+                   _buildPlacer.CanPlace("Stairs", lowerTile, OrientationFor(uphillDirection));
         }
 
         private bool HasStairsAt(Vector3Int tile)

@@ -149,6 +149,18 @@ namespace TimberbornAutopilot.Acting
             return entrance - direction.ToOffset();
         }
 
+        /// <summary>Unlocked already, or affordable to unlock right now.</summary>
+        public bool IsAvailable(string templateName)
+        {
+            BuildingSpec buildingSpec = ResolveTemplate(templateName);
+            if (buildingSpec == null)
+            {
+                return false;
+            }
+            return _buildingUnlockingService.Unlocked(buildingSpec) ||
+                   buildingSpec.ScienceCost <= _scienceService.SciencePoints;
+        }
+
         public List<string> ListTemplateNames()
         {
             var names = new List<string>();
