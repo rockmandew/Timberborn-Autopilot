@@ -93,21 +93,12 @@ namespace TimberbornAutopilot.Planning
             return FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target)) != null;
         }
 
+        /// <summary>ONLY the district doorstep. Existing paths are walkable during
+        /// the search, so the real network is used organically — but orphaned,
+        /// disconnected path stubs can never masquerade as network seeds.</summary>
         private List<Vector3Int> NetworkSeeds(Vector3Int networkRoot)
         {
-            var seeds = new List<Vector3Int> { SurfaceTile(networkRoot) };
-            for (int dx = -14; dx <= 14; dx++)
-            {
-                for (int dy = -14; dy <= 14; dy++)
-                {
-                    Vector3Int tile = SurfaceTile(new Vector3Int(networkRoot.x + dx, networkRoot.y + dy, 0));
-                    if (_blockService.GetPathObjectAt(tile) != null)
-                    {
-                        seeds.Add(tile);
-                    }
-                }
-            }
-            return seeds;
+            return new List<Vector3Int> { SurfaceTile(networkRoot) };
         }
 
         private List<RouteStep> FindRoute(List<Vector3Int> seeds, Vector3Int goal)
