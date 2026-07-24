@@ -136,16 +136,13 @@ namespace TimberbornAutopilot.Planning
                                  out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
-                    if (_pathRouter.Connect(networkRoot, entrance ?? placedAt, out int tiles))
+                    if (_pathRouter.Connect(networkRoot, entrance ?? placedAt, out string report))
                     {
-                        if (tiles > 0)
-                        {
-                            _brainLog.Note($"Routed {tiles} path tiles to the new {candidate}.");
-                        }
+                        _brainLog.Note($"{candidate} connection: {report}.");
                     }
                     else
                     {
-                        _brainLog.Suggest($"No flat route to the new {candidate} at " +
+                        _brainLog.Suggest($"No route to the new {candidate} at " +
                                           $"({placedAt.x},{placedAt.y}) — it may need stairs or a bridge.");
                     }
                     goal.OnPlaced?.Invoke(placedAt);
@@ -225,17 +222,16 @@ namespace TimberbornAutopilot.Planning
                 {
                     continue;
                 }
-                if (_pathRouter.Connect(networkRoot, doorstep, out int tiles))
+                if (_pathRouter.Connect(networkRoot, doorstep, out string report))
                 {
-                    if (tiles > 0)
+                    if (!report.Contains(" 0 placed") || report.Contains("failed"))
                     {
-                        _brainLog.Note($"Connected doorstep at ({doorstep.x},{doorstep.y}) " +
-                                       $"with {tiles} path tiles.");
+                        _brainLog.Note($"Doorstep ({doorstep.x},{doorstep.y}): {report}.");
                     }
                 }
                 else if (_givenSuggestions.Add($"no-route-{doorstep.x}-{doorstep.y}"))
                 {
-                    _brainLog.Suggest($"Building at ({doorstep.x},{doorstep.y}) has no flat route " +
+                    _brainLog.Suggest($"Building at ({doorstep.x},{doorstep.y}) has no route " +
                                       "to the district — it may need stairs, or consider relocating it.");
                 }
                 return;

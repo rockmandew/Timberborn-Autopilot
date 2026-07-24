@@ -38,31 +38,51 @@ namespace TimberbornAutopilot.Planning
         /// <summary>Routes from the existing path network (seeded from the district
         /// doorstep and nearby path tiles) to the target doorstep, placing paths
         /// and stairs. Returns false when no route exists.</summary>
-        public bool Connect(Vector3Int networkRoot, Vector3Int target, out int tilesPlaced)
+        public bool Connect(Vector3Int networkRoot, Vector3Int target, out string report)
         {
-            tilesPlaced = 0;
             List<RouteStep> route = FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target));
             if (route == null)
             {
+                report = "no route";
                 return false;
             }
+            int placed = 0, existing = 0, failed = 0;
+            string firstError = null;
             foreach (RouteStep step in route)
             {
                 if (step.IsStairs)
                 {
-                    if (!HasStairsAt(step.Tile) &&
-                        _buildPlacer.TryPlace("Stairs", step.Tile, step.StairsOrientation,
-                                              Priority.Normal, out _))
+                    if (HasStairsAt(step.Tile))
                     {
-                        tilesPlaced++;
+                        existing++;
+                    }
+                    else if (_buildPlacer.TryPlace("Stairs", step.Tile, step.StairsOrientation,
+                                                   Priority.Normal, out string stairsError))
+                    {
+                        placed++;
+                    }
+                    else
+                    {
+                        failed++;
+                        firstError = firstError ?? stairsError;
                     }
                 }
-                else if (_blockService.GetPathObjectAt(step.Tile) == null &&
-                         _buildPlacer.TryPlacePath(step.Tile, out _))
+                else if (_blockService.GetPathObjectAt(step.Tile) != null)
                 {
-                    tilesPlaced++;
+                    existing++;
+                }
+                else if (_buildPlacer.TryPlacePath(step.Tile, out string pathError))
+                {
+                    placed++;
+                }
+                else
+                {
+                    failed++;
+                    firstError = firstError ?? pathError;
                 }
             }
+            report = $"route {route.Count} tiles: {placed} placed, {existing} existing, {failed} failed" +
+                     (firstError != null ? $" (first failure: {firstError})" : "");
             return true;
         }
 
