@@ -322,7 +322,9 @@ namespace TimberbornAutopilot.Planning
 
             var goals = new List<Goal>
             {
-                new Goal("water-pump", new[] { "WaterPump" }, 1, 30,
+                new Goal("water-pump", new[] { "WaterPump" },
+                    // Second pump when water stays hand-to-mouth after the opening days.
+                    world.CycleDay >= 3 && world.WaterDaysLeft < 1.5f ? 2 : 1, 30,
                     "Placing a Water Pump by the river — drinking water is survival priority #1.")
                     { Anchor = null, SiteFilter = TouchesWater, BuilderPriority = Priority.VeryHigh },
                 new Goal("lumberjacks", new[] { "LumberjackFlag" }, 2, 12,
