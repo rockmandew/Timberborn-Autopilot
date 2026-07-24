@@ -30,6 +30,7 @@ namespace TimberbornAutopilot.Planning
         private readonly HashSet<string> _announcedGoals = new HashSet<string>();
         private readonly HashSet<string> _givenSuggestions = new HashSet<string>();
         private readonly HashSet<Vector3Int> _connectivityChecked = new HashSet<Vector3Int>();
+        private int _lastRepairDay = -1;
 
         public bool Enabled { get; set; } = true;
 
@@ -88,6 +89,14 @@ namespace TimberbornAutopilot.Planning
                 // Goal can't act right now (science, no spot) — let later goals proceed.
             }
 
+            // Re-sweep every day: routes that failed earlier (e.g. stairs were
+            // unaffordable) succeed once science or terrain changes.
+            int day = world.Cycle * 100 + world.CycleDay;
+            if (day != _lastRepairDay)
+            {
+                _lastRepairDay = day;
+                _connectivityChecked.Clear();
+            }
             RepairConnectivity(networkRoot);
             CheckSuggestions(world);
         }
