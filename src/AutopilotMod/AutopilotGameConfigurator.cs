@@ -14,6 +14,7 @@ namespace TimberbornAutopilot
         {
             containerDefinition.Bind<CampaignPlanner>().AsSingleton();
             containerDefinition.Bind<WorldModel>().AsSingleton();
+            containerDefinition.Bind<MapSurveyor>().AsSingleton();
             containerDefinition.Bind<BuildPlacer>().AsSingleton();
             containerDefinition.Bind<ZonePlanner>().AsSingleton();
             containerDefinition.Bind<CrewManager>().AsSingleton();
