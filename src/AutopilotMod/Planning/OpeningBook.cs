@@ -148,19 +148,26 @@ namespace TimberbornAutopilot.Planning
                 new Goal("gatherer", new[] { "GathererFlag" }, 1, 12,
                     "Placing a Gatherer Flag on the berry patch — free food while farms grow.")
                     { Anchor = berries },
-                new Goal("farm", new[] { "FarmHouse", "Farmhouse" }, 1, 18,
+                new Goal("log-pile", new[] { "SmallPile" }, 1, 12,
+                    "Adding a Small Pile — logs need a home near the lumberjacks.")
+                    { Anchor = trees },
+                new Goal("farm", new[] { "EfficientFarmHouse" }, 1, 18,
                     "Building a Farmhouse — carrots are the fastest calories per tile.")
                     { OnPlaced = ZoneCarrotsAround },
-                new Goal("forester", new[] { "Forester", "ForesterFlag" }, 1, 15,
+                new Goal("warehouse", new[] { "SmallWarehouse" }, 1, 12,
+                    "Adding a Small Warehouse — food storage before the first drought."),
+                new Goal("forester", new[] { "Forester" }, 1, 15,
                     "Adding a Forester — replanted trees prevent the mid-game wood crisis.")
                     { OnPlaced = ZoneTreesAround },
-                new Goal("water-tank", new[] { "SmallWaterTank", "WaterTank" }, 1, 15,
+                new Goal("water-tank", new[] { "SmallTank" }, 2, 15,
                     $"Building water storage — the {world.NextHazard} needs " +
                     $"{world.WaterTargetForHazard:F0} water banked."),
                 new Goal("inventor", new[] { "Inventor" }, 1, 15,
                     "Building an Inventor — science unlocks everything on the wellbeing ladder."),
                 new Goal("housing", new[] { "Lodge" }, world.Homeless > 0 ? 2 : 1, 15,
                     "Adding a Lodge — rested beavers work faster, and shared housing means kits."),
+                new Goal("campfire", new[] { "Campfire" }, 1, 12,
+                    "Placing a Campfire — first rung of the wellbeing ladder toward Iron Teeth."),
             };
             return goals;
         }
