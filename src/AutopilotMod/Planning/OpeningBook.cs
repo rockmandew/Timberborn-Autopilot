@@ -90,12 +90,20 @@ namespace TimberbornAutopilot.Planning
             }
 
             // Re-sweep every day: routes that failed earlier (e.g. stairs were
-            // unaffordable) succeed once science or terrain changes.
+            // unaffordable) succeed once science or terrain changes. Survival
+            // construction also gets builder priority daily (covers player-placed
+            // and pre-existing sites).
             int day = world.Cycle * 100 + world.CycleDay;
             if (day != _lastRepairDay)
             {
                 _lastRepairDay = day;
                 _connectivityChecked.Clear();
+                int boosted = _worldQuery.BoostConstructionPriority("WaterPump", Priority.VeryHigh)
+                            + _worldQuery.BoostConstructionPriority("Inventor", Priority.High);
+                if (boosted > 0)
+                {
+                    _brainLog.Note($"Raised builder priority on {boosted} survival-critical site(s).");
+                }
             }
             RepairConnectivity(networkRoot);
             CheckSuggestions(world);
@@ -133,6 +141,7 @@ namespace TimberbornAutopilot.Planning
             foreach (string candidate in goal.TemplateCandidates)
             {
                 if (TryPlaceNear(candidate, target, goal.SearchRadius, networkRoot, goal.SiteFilter,
+                                 goal.BuilderPriority,
                                  out Vector3Int placedAt, out Vector3Int? entrance, ref lastError))
                 {
                     _brainLog.Note($"Placed {candidate} at ({placedAt.x},{placedAt.y},{placedAt.z}).");
@@ -168,7 +177,7 @@ namespace TimberbornAutopilot.Planning
         /// <summary>Spiral search for a valid placement whose doorstep is reachable
         /// from the path network, trying all orientations.</summary>
         private bool TryPlaceNear(string templateName, Vector3Int anchor, int radius, Vector3Int networkRoot,
-                                  Func<Vector3Int, bool> siteFilter,
+                                  Func<Vector3Int, bool> siteFilter, Priority priority,
                                   out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
             foreach (Vector3Int tile in Spiral(anchor, radius))
@@ -191,7 +200,7 @@ namespace TimberbornAutopilot.Planning
                     {
                         continue;
                     }
-                    if (_buildPlacer.TryPlace(templateName, coords, orientation, Priority.Normal,
+                    if (_buildPlacer.TryPlace(templateName, coords, orientation, priority,
                                               out string error, out entrance))
                     {
                         placedAt = coords;
@@ -224,7 +233,8 @@ namespace TimberbornAutopilot.Planning
                 }
                 if (_pathRouter.Connect(networkRoot, doorstep, out string report))
                 {
-                    if (!report.Contains(" 0 placed") || report.Contains("failed"))
+                    // Only narrate when something actually changed or went wrong.
+                    if (!report.Contains(" 0 placed,") || !report.Contains(" 0 failed"))
                     {
                         _brainLog.Note($"Doorstep ({doorstep.x},{doorstep.y}): {report}.");
                     }
@@ -247,7 +257,7 @@ namespace TimberbornAutopilot.Planning
             {
                 new Goal("water-pump", new[] { "WaterPump" }, 1, 30,
                     "Placing a Water Pump by the river — drinking water is survival priority #1.")
-                    { Anchor = null, SiteFilter = TouchesWater },
+                    { Anchor = null, SiteFilter = TouchesWater, BuilderPriority = Priority.VeryHigh },
                 new Goal("lumberjacks", new[] { "LumberjackFlag" }, 2, 12,
                     "Adding Lumberjack Flags near the forest — logs fund everything early.")
                     { Anchor = trees },
@@ -258,7 +268,8 @@ namespace TimberbornAutopilot.Planning
                     "Adding a Small Pile — logs need a home near the lumberjacks.")
                     { Anchor = trees },
                 new Goal("inventor", new[] { "Inventor" }, 1, 15,
-                    "Building an Inventor — science income unlocks the whole tech ladder."),
+                    "Building an Inventor — science income unlocks the whole tech ladder.")
+                    { BuilderPriority = Priority.High },
                 new Goal("farm", new[] { "EfficientFarmHouse" }, 1, 18,
                     "Building a Farmhouse — carrots are the fastest calories per tile.")
                     { OnPlaced = ZoneCarrotsAround },
@@ -354,6 +365,7 @@ namespace TimberbornAutopilot.Planning
             public Vector3Int? Anchor { get; set; }
             public Action<Vector3Int> OnPlaced { get; set; }
             public Func<Vector3Int, bool> SiteFilter { get; set; }
+            public Priority BuilderPriority { get; set; } = Priority.Normal;
 
             public Goal(string key, string[] templateCandidates, int targetCount,
                         int searchRadius, string intent)

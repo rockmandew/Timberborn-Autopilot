@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 using Timberborn.BlockSystem;
+using Timberborn.BuilderPrioritySystem;
 using Timberborn.Buildings;
 using Timberborn.Cutting;
 using Timberborn.EntitySystem;
 using Timberborn.GameDistricts;
 using Timberborn.Gathering;
 using Timberborn.NaturalResourcesModelSystem;
+using Timberborn.PrioritySystem;
 using UnityEngine;
 
 namespace TimberbornAutopilot.Planning
@@ -63,6 +65,27 @@ namespace TimberbornAutopilot.Planning
                     : blockObject.Coordinates);
             }
             return doorsteps;
+        }
+
+        /// <summary>Raises builder priority on every matching building still under
+        /// construction. Returns how many were changed.</summary>
+        public int BoostConstructionPriority(string baseName, Priority priority)
+        {
+            int boosted = 0;
+            foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
+            {
+                if (!NameMatches(building.GameObject.name, baseName))
+                {
+                    continue;
+                }
+                var prioritizable = building.GetComponent<BuilderPrioritizable>();
+                if (prioritizable != null && prioritizable.Priority != priority)
+                {
+                    prioritizable.SetPriority(priority);
+                    boosted++;
+                }
+            }
+            return boosted;
         }
 
         public Vector3Int? DistrictCenterCoordinates()
