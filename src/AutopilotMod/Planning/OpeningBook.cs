@@ -20,6 +20,7 @@ namespace TimberbornAutopilot.Planning
     {
         private readonly BuildPlacer _buildPlacer;
         private readonly ZonePlanner _zonePlanner;
+        private readonly CrewManager _crewManager;
         private readonly WorldQuery _worldQuery;
         private readonly WorldModel _worldModel;
         private readonly BrainLog _brainLog;
@@ -36,6 +37,7 @@ namespace TimberbornAutopilot.Planning
 
         public OpeningBook(BuildPlacer buildPlacer,
                            ZonePlanner zonePlanner,
+                           CrewManager crewManager,
                            WorldQuery worldQuery,
                            WorldModel worldModel,
                            BrainLog brainLog,
@@ -45,6 +47,7 @@ namespace TimberbornAutopilot.Planning
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
+            _crewManager = crewManager;
             _worldQuery = worldQuery;
             _worldModel = worldModel;
             _brainLog = brainLog;
@@ -322,13 +325,13 @@ namespace TimberbornAutopilot.Planning
                     { Anchor = null, SiteFilter = TouchesWater, BuilderPriority = Priority.VeryHigh },
                 new Goal("lumberjacks", new[] { "LumberjackFlag" }, 2, 12,
                     "Adding Lumberjack Flags near the forest — logs fund everything early.")
-                    { Anchor = trees },
+                    { Anchor = trees, OnPlaced = MarkCuttingAreaAround },
                 new Goal("gatherer", new[] { "GathererFlag" }, 1, 12,
                     "Placing a Gatherer Flag on the berry patch — free food while farms grow.")
                     { Anchor = berries },
                 new Goal("log-pile", new[] { "SmallPile" }, 1, 12,
                     "Adding a Small Pile — logs need a home near the lumberjacks.")
-                    { Anchor = trees },
+                    { Anchor = trees, OnPlaced = at => ConfigureStorage(at, "Log", "SmallPile") },
                 new Goal("inventor", new[] { "Inventor" }, 1, 15,
                     "Building an Inventor — science income unlocks the whole tech ladder.")
                     { BuilderPriority = Priority.High },
@@ -336,7 +339,8 @@ namespace TimberbornAutopilot.Planning
                     "Building a Farmhouse — carrots are the fastest calories per tile.")
                     { OnPlaced = ZoneCarrotsAround },
                 new Goal("warehouse", new[] { "SmallWarehouse" }, 1, 12,
-                    "Adding a Small Warehouse — food storage before the first drought."),
+                    "Adding a Small Warehouse — food storage before the first drought.")
+                    { OnPlaced = at => ConfigureStorage(at, "Berries", "SmallWarehouse") },
                 new Goal("water-tank", new[] { "SmallTank" }, 2, 15,
                     $"Building water storage — the {world.NextHazard} needs " +
                     $"{world.WaterTargetForHazard:F0} water banked."),
@@ -349,6 +353,21 @@ namespace TimberbornAutopilot.Planning
                     "Placing a Campfire — first rung of the wellbeing ladder toward Iron Teeth."),
             };
             return goals;
+        }
+
+        private void MarkCuttingAreaAround(Vector3Int flag)
+        {
+            _zonePlanner.MarkTreesForCutting(
+                flag + new Vector3Int(-6, -6, 0), flag + new Vector3Int(6, 6, 0));
+            _brainLog.Note($"Marked the forest around ({flag.x},{flag.y}) for cutting.");
+        }
+
+        private void ConfigureStorage(Vector3Int at, string goodId, string label)
+        {
+            if (_crewManager.TryConfigureStorage(at, goodId))
+            {
+                _brainLog.Note($"Set the {label} at ({at.x},{at.y}) to store {goodId}.");
+            }
         }
 
         private void ZoneCarrotsAround(Vector3Int farm)
