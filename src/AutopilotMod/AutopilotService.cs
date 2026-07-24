@@ -3,6 +3,7 @@ using Timberborn.GameCycleSystem;
 using Timberborn.HttpApiSystem;
 using Timberborn.SingletonSystem;
 using Timberborn.TickSystem;
+using TimberbornAutopilot.Http;
 using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
 using UnityEngine;
@@ -20,14 +21,16 @@ namespace TimberbornAutopilot
         private readonly WorldModel _worldModel;
         private readonly HttpApi _httpApi;
         private readonly CampaignPlanner _campaignPlanner;
+        private readonly AutopilotCommandEndpoint _commandEndpoint;
 
         public AutopilotService(EventBus eventBus, WorldModel worldModel, HttpApi httpApi,
-                                CampaignPlanner campaignPlanner)
+                                CampaignPlanner campaignPlanner, AutopilotCommandEndpoint commandEndpoint)
         {
             _eventBus = eventBus;
             _worldModel = worldModel;
             _httpApi = httpApi;
             _campaignPlanner = campaignPlanner;
+            _commandEndpoint = commandEndpoint;
         }
 
         public void Load()
@@ -42,7 +45,8 @@ namespace TimberbornAutopilot
 
         public void Tick()
         {
-            // Planner loop lands here in v0.4+.
+            _commandEndpoint.ExecutePending();
+            // Planner loop lands here in v0.5.
         }
 
         [OnEvent]

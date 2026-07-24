@@ -1,5 +1,6 @@
 using Bindito.Core;
 using Timberborn.HttpApiSystem;
+using TimberbornAutopilot.Acting;
 using TimberbornAutopilot.Http;
 using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
@@ -13,8 +14,14 @@ namespace TimberbornAutopilot
         {
             containerDefinition.Bind<CampaignPlanner>().AsSingleton();
             containerDefinition.Bind<WorldModel>().AsSingleton();
+            containerDefinition.Bind<BuildPlacer>().AsSingleton();
+            containerDefinition.Bind<ZonePlanner>().AsSingleton();
+            containerDefinition.Bind<CrewManager>().AsSingleton();
+            containerDefinition.Bind<SpeedController>().AsSingleton();
+            containerDefinition.Bind<AutopilotCommandEndpoint>().AsSingleton();
             containerDefinition.Bind<AutopilotService>().AsSingleton();
             containerDefinition.MultiBind<IHttpApiEndpoint>().To<AutopilotStatusEndpoint>().AsSingleton();
+            containerDefinition.MultiBind<IHttpApiEndpoint>().ToExisting<AutopilotCommandEndpoint>();
         }
     }
 }
