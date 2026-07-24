@@ -90,11 +90,24 @@ namespace TimberbornAutopilot.Planning
         }
 
         /// <summary>True when a route (flat or staired) to the target exists —
-        /// used as a placement precondition so no building is born unreachable.</summary>
-        public bool CanReach(Vector3Int networkRoot, Vector3Int target)
+        /// used as a placement precondition so no building is born unreachable.
+        /// Columns in <paramref name="blockedColumns"/> (e.g. a hypothetical
+        /// building's own footprint) are treated as unwalkable.</summary>
+        public bool CanReach(Vector3Int networkRoot, Vector3Int target,
+                             HashSet<Vector3Int> blockedColumns = null)
         {
-            return FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target)) != null;
+            _blockedColumns = blockedColumns;
+            try
+            {
+                return FindRoute(NetworkSeeds(networkRoot), SurfaceTile(target)) != null;
+            }
+            finally
+            {
+                _blockedColumns = null;
+            }
         }
+
+        private HashSet<Vector3Int> _blockedColumns;
 
         /// <summary>ONLY the district doorstep. Existing paths are walkable during
         /// the search, so the real network is used organically — but orphaned,
@@ -219,6 +232,10 @@ namespace TimberbornAutopilot.Planning
 
         private bool IsWalkable(Vector3Int tile)
         {
+            if (_blockedColumns != null && _blockedColumns.Contains(new Vector3Int(tile.x, tile.y, 0)))
+            {
+                return false;
+            }
             if (_blockService.GetPathObjectAt(tile) != null)
             {
                 return true;

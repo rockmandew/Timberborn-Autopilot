@@ -149,6 +149,27 @@ namespace TimberbornAutopilot.Acting
             return entrance - direction.ToOffset();
         }
 
+        /// <summary>All ground columns (x,y) a hypothetical placement would occupy.</summary>
+        public HashSet<Vector3Int> PredictFootprintColumns(string templateName, Vector3Int coordinates,
+                                                           Orientation orientation)
+        {
+            var columns = new HashSet<Vector3Int>();
+            BuildingSpec buildingSpec = ResolveTemplate(templateName);
+            if (buildingSpec == null)
+            {
+                return columns;
+            }
+            BlockObjectSpec blockObjectSpec = buildingSpec.GetSpec<BlockObjectSpec>();
+            var placement = new Placement(
+                new Vector3Int(coordinates.x, coordinates.y, coordinates.z - blockObjectSpec.BaseZ),
+                orientation, FlipMode.Unflipped);
+            foreach (Block block in blockObjectSpec.GetBlocks(placement))
+            {
+                columns.Add(new Vector3Int(block.Coordinates.x, block.Coordinates.y, 0));
+            }
+            return columns;
+        }
+
         /// <summary>Unlocked already, or affordable to unlock right now.</summary>
         public bool IsAvailable(string templateName)
         {

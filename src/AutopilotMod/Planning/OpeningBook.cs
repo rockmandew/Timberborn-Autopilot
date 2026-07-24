@@ -180,6 +180,7 @@ namespace TimberbornAutopilot.Planning
                                   Func<Vector3Int, bool> siteFilter, Priority priority,
                                   out Vector3Int placedAt, out Vector3Int? entrance, ref string lastError)
         {
+            List<Vector3Int> existingDoorsteps = _worldQuery.BuildingDoorsteps();
             foreach (Vector3Int tile in Spiral(anchor, radius))
             {
                 int height = _terrainService.GetTerrainHeightBelow(
@@ -189,16 +190,31 @@ namespace TimberbornAutopilot.Planning
                 {
                     continue;
                 }
-                foreach (Orientation orientation in Orientations)
+                // Prefer orientations whose door faces the path network.
+                foreach (Orientation orientation in OrientationsByDoorProximity(templateName, coords, networkRoot))
                 {
                     if (!_buildPlacer.CanPlace(templateName, coords, orientation))
                     {
                         continue;
                     }
-                    Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
-                    if (doorstep.HasValue && !_pathRouter.CanReach(networkRoot, doorstep.Value))
+                    HashSet<Vector3Int> footprint =
+                        _buildPlacer.PredictFootprintColumns(templateName, coords, orientation);
+                    // Never wall in an existing building's door.
+                    if (CoversAnyDoorstep(footprint, existingDoorsteps))
                     {
                         continue;
+                    }
+                    Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
+                    if (doorstep.HasValue)
+                    {
+                        Vector3Int doorColumn = new Vector3Int(doorstep.Value.x, doorstep.Value.y, 0);
+                        // Own footprint must not sit on its own door, and the door
+                        // must be reachable around (not through) the new body.
+                        if (footprint.Contains(doorColumn) ||
+                            !_pathRouter.CanReach(networkRoot, doorstep.Value, footprint))
+                        {
+                            continue;
+                        }
                     }
                     if (_buildPlacer.TryPlace(templateName, coords, orientation, priority,
                                               out string error, out entrance))
@@ -217,6 +233,38 @@ namespace TimberbornAutopilot.Planning
             }
             placedAt = default;
             entrance = null;
+            return false;
+        }
+
+        private IEnumerable<Orientation> OrientationsByDoorProximity(string templateName, Vector3Int coords,
+                                                                     Vector3Int networkRoot)
+        {
+            var scored = new List<(Orientation orientation, int score)>();
+            foreach (Orientation orientation in Orientations)
+            {
+                Vector3Int? doorstep = _buildPlacer.PredictDoorstep(templateName, coords, orientation);
+                int score = doorstep.HasValue
+                    ? Mathf.Abs(doorstep.Value.x - networkRoot.x) + Mathf.Abs(doorstep.Value.y - networkRoot.y)
+                    : int.MaxValue;
+                scored.Add((orientation, score));
+            }
+            scored.Sort((a, b) => a.score.CompareTo(b.score));
+            foreach ((Orientation orientation, _) in scored)
+            {
+                yield return orientation;
+            }
+        }
+
+        private static bool CoversAnyDoorstep(HashSet<Vector3Int> footprintColumns,
+                                              List<Vector3Int> doorsteps)
+        {
+            foreach (Vector3Int doorstep in doorsteps)
+            {
+                if (footprintColumns.Contains(new Vector3Int(doorstep.x, doorstep.y, 0)))
+                {
+                    return true;
+                }
+            }
             return false;
         }
 
