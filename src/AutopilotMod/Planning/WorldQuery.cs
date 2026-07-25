@@ -75,7 +75,10 @@ namespace TimberbornAutopilot.Planning
             int count = 0;
             foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
             {
-                if (building.HasComponent<ConstructionSite>())
+                // Paths are trivial free sites — only real buildings saturate
+                // the material/builder pipeline.
+                if (!building.GameObject.name.StartsWith("Path") &&
+                    building.HasComponent<ConstructionSite>())
                 {
                     count++;
                 }
