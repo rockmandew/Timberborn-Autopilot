@@ -4,6 +4,7 @@ using TimberbornAutopilot.Acting;
 using TimberbornAutopilot.Http;
 using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
+using TimberbornAutopilot.Training;
 
 namespace TimberbornAutopilot
 {
@@ -12,6 +13,8 @@ namespace TimberbornAutopilot
     {
         public void Configure(IContainerDefinition containerDefinition)
         {
+            containerDefinition.Bind<AutopilotParams>().AsSingleton();
+            containerDefinition.Bind<EpisodeRecorder>().AsSingleton();
             containerDefinition.Bind<CampaignPlanner>().AsSingleton();
             containerDefinition.Bind<BrainLog>().AsSingleton();
             containerDefinition.Bind<WorldQuery>().AsSingleton();

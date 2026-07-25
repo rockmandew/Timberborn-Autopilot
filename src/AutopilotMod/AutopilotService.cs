@@ -6,6 +6,7 @@ using Timberborn.TickSystem;
 using TimberbornAutopilot.Http;
 using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
+using TimberbornAutopilot.Training;
 using UnityEngine;
 
 namespace TimberbornAutopilot
@@ -23,11 +24,12 @@ namespace TimberbornAutopilot
         private readonly CampaignPlanner _campaignPlanner;
         private readonly AutopilotCommandEndpoint _commandEndpoint;
         private readonly OpeningBook _openingBook;
+        private readonly AutopilotParams _params;
         private int _ticksSincePlanning;
 
         public AutopilotService(EventBus eventBus, WorldModel worldModel, HttpApi httpApi,
                                 CampaignPlanner campaignPlanner, AutopilotCommandEndpoint commandEndpoint,
-                                OpeningBook openingBook)
+                                OpeningBook openingBook, AutopilotParams autopilotParams)
         {
             _eventBus = eventBus;
             _worldModel = worldModel;
@@ -35,10 +37,13 @@ namespace TimberbornAutopilot
             _campaignPlanner = campaignPlanner;
             _commandEndpoint = commandEndpoint;
             _openingBook = openingBook;
+            _params = autopilotParams;
         }
 
         public void Load()
         {
+            _params.CopyFrom(AutopilotParams.Load());
+            _planningInterval = _params.PlanningTickInterval;
             _eventBus.Register(this);
             if (!_httpApi.IsRunning)
             {
@@ -49,12 +54,14 @@ namespace TimberbornAutopilot
 
         public void Tick()
         {
-            if (++_ticksSincePlanning >= 30)
+            if (++_ticksSincePlanning >= _planningInterval)
             {
                 _ticksSincePlanning = 0;
                 _openingBook.PlanningPass();
             }
         }
+
+        private int _planningInterval = 30;
 
         /// <summary>Runs every frame, even while the game is paused — remote
         /// commands work at any time.</summary>

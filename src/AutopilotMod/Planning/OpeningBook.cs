@@ -6,6 +6,7 @@ using Timberborn.TerrainSystem;
 using Timberborn.WaterSystem;
 using TimberbornAutopilot.Acting;
 using TimberbornAutopilot.Sensing;
+using TimberbornAutopilot.Training;
 using UnityEngine;
 
 namespace TimberbornAutopilot.Planning
@@ -27,6 +28,7 @@ namespace TimberbornAutopilot.Planning
         private readonly ITerrainService _terrainService;
         private readonly PathRouter _pathRouter;
         private readonly IThreadSafeWaterMap _waterMap;
+        private readonly AutopilotParams _params;
 
         private readonly HashSet<string> _announcedGoals = new HashSet<string>();
         private readonly HashSet<string> _givenSuggestions = new HashSet<string>();
@@ -43,7 +45,8 @@ namespace TimberbornAutopilot.Planning
                            BrainLog brainLog,
                            ITerrainService terrainService,
                            PathRouter pathRouter,
-                           IThreadSafeWaterMap waterMap)
+                           IThreadSafeWaterMap waterMap,
+                           AutopilotParams autopilotParams)
         {
             _buildPlacer = buildPlacer;
             _zonePlanner = zonePlanner;
@@ -54,6 +57,7 @@ namespace TimberbornAutopilot.Planning
             _terrainService = terrainService;
             _pathRouter = pathRouter;
             _waterMap = waterMap;
+            _params = autopilotParams;
         }
 
         /// <summary>One planning pass: find the first unsatisfied goal and take
@@ -324,10 +328,11 @@ namespace TimberbornAutopilot.Planning
             {
                 new Goal("water-pump", new[] { "WaterPump" },
                     // Second pump when water stays hand-to-mouth after the opening days.
-                    world.CycleDay >= 3 && world.WaterDaysLeft < 1.5f ? 2 : 1, 30,
+                    world.CycleDay >= _params.SecondPumpEarliestDay &&
+                    world.WaterDaysLeft < _params.SecondPumpWaterDays ? 2 : 1, _params.PumpSearchRadius,
                     "Placing a Water Pump by the river — drinking water is survival priority #1.")
                     { Anchor = null, SiteFilter = TouchesWater, BuilderPriority = Priority.VeryHigh },
-                new Goal("lumberjacks", new[] { "LumberjackFlag" }, 2, 12,
+                new Goal("lumberjacks", new[] { "LumberjackFlag" }, _params.LumberjackTarget, 12,
                     "Adding Lumberjack Flags near the forest — logs fund everything early.")
                     { Anchor = trees, OnPlaced = MarkCuttingAreaAround },
                 new Goal("gatherer", new[] { "GathererFlag" }, 1, 12,
@@ -336,7 +341,7 @@ namespace TimberbornAutopilot.Planning
                 new Goal("log-pile", new[] { "SmallPile" }, 1, 12,
                     "Adding a Small Pile — logs need a home near the lumberjacks.")
                     { Anchor = trees, OnPlaced = at => ConfigureStorage(at, "Log", "SmallPile") },
-                new Goal("inventor", new[] { "Inventor" }, 1, 15,
+                new Goal("inventor", new[] { "Inventor" }, 1, _params.DefaultSearchRadius,
                     "Building an Inventor — science income unlocks the whole tech ladder.")
                     { BuilderPriority = Priority.High },
                 new Goal("farm", new[] { "EfficientFarmHouse" }, 1, 18,
@@ -345,13 +350,14 @@ namespace TimberbornAutopilot.Planning
                 new Goal("warehouse", new[] { "SmallWarehouse" }, 1, 12,
                     "Adding a Small Warehouse — food storage before the first drought.")
                     { OnPlaced = at => ConfigureStorage(at, "Berries", "SmallWarehouse") },
-                new Goal("water-tank", new[] { "SmallTank" }, 2, 15,
+                new Goal("water-tank", new[] { "SmallTank" }, _params.TankTarget, _params.DefaultSearchRadius,
                     $"Building water storage — the {world.NextHazard} needs " +
                     $"{world.WaterTargetForHazard:F0} water banked."),
-                new Goal("forester", new[] { "Forester" }, 1, 15,
+                new Goal("forester", new[] { "Forester" }, 1, _params.DefaultSearchRadius,
                     "Adding a Forester — replanted trees prevent the mid-game wood crisis.")
                     { OnPlaced = ZoneTreesAround },
-                new Goal("housing", new[] { "Lodge" }, world.Homeless > 0 ? 2 : 1, 15,
+                new Goal("housing", new[] { "Lodge" },
+                    world.Homeless > 0 ? _params.LodgeTarget : 1, _params.DefaultSearchRadius,
                     "Adding a Lodge — rested beavers work faster, and shared housing means kits."),
                 new Goal("campfire", new[] { "Campfire" }, 1, 12,
                     "Placing a Campfire — first rung of the wellbeing ladder toward Iron Teeth."),
@@ -361,7 +367,7 @@ namespace TimberbornAutopilot.Planning
 
         private void MarkCuttingAreaAround(Vector3Int flag)
         {
-            List<Vector3Int> trees = _worldQuery.ResourceCoordinatesNear(flag, 12, gatherable: false);
+            List<Vector3Int> trees = _worldQuery.ResourceCoordinatesNear(flag, _params.TreeMarkRadius, gatherable: false);
             _zonePlanner.MarkTreeCoordinates(trees);
             _brainLog.Note($"Marked {trees.Count} trees around ({flag.x},{flag.y}) for cutting.");
         }
@@ -376,15 +382,17 @@ namespace TimberbornAutopilot.Planning
 
         private void ZoneCarrotsAround(Vector3Int farm)
         {
+            int half = _params.CarrotZoneHalf;
             int zoned = _zonePlanner.ZonePlanting(
-                farm + new Vector3Int(-5, -5, 0), farm + new Vector3Int(5, 5, 0), "Carrot");
+                farm + new Vector3Int(-half, -half, 0), farm + new Vector3Int(half, half, 0), "Carrot");
             _brainLog.Note($"Zoned {zoned} tiles of carrots around the farm.");
         }
 
         private void ZoneTreesAround(Vector3Int forester)
         {
+            int half = _params.PineZoneHalf;
             int zoned = _zonePlanner.ZonePlanting(
-                forester + new Vector3Int(-6, -6, 0), forester + new Vector3Int(6, 6, 0), "Pine");
+                forester + new Vector3Int(-half, -half, 0), forester + new Vector3Int(half, half, 0), "Pine");
             _brainLog.Note($"Zoned {zoned} tiles of pines around the forester.");
         }
 

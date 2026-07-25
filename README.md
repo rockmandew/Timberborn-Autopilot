@@ -72,9 +72,27 @@ netsh advfirewall firewall add rule name="Timberborn Autopilot Dashboard" dir=in
 
 Then browse to `http://<your-pc-lan-ip>:8081/api/autopilot/remote` from your phone. (Exposes game control to your local network only; use a VPN like Tailscale for access away from home.)
 
-## Planned: Brain Training mode (self-play loop)
+## Brain Training mode (self-play loop) — IMPLEMENTED
 
-A toggleable overnight training cycle — design settled, implementation upcoming:
+Overnight unattended training. Start it with:
+
+```powershell
+.\training\watchdog.ps1
+```
+
+Options: `-MaxEpisodes 20 -MapName Plains -FactionId Folktails -MaxCycles 6 -GameSpeed 10 -EpisodeTimeoutMinutes 75`.
+**Stop it** by creating `Documents\Timberborn\Autopilot\STOP` (or Ctrl+C in the watchdog window). The watchdog always disables training mode on exit, so normal play is never hijacked.
+
+How it works (files live in `Documents\Timberborn\Autopilot\`):
+
+- `training.json` — the on/off switch + episode settings (faction, map, settlement name, cycle horizon, game speed). Written by the watchdog; the mod reads it.
+- When enabled, the mod's main-menu service auto-starts a fresh colony (`GameSceneLoader.StartNewGameInstantly`), the autopilot plays at 10×, and the episode recorder snapshots the success measures every game day into `episodes/episode_*.jsonl`.
+- **Objective function:** days-to-average-wellbeing-15 (the Iron Teeth unlock — an in-game gate, not an assumption). Success score = `10000 − 10×days`; horizon runs score on wellbeing+population progress; extinction scores negative. Stocks/happiness/science are logged as *diagnostics*, not objectives.
+- Episode end → mod writes `last-result.json` and exits the game; the watchdog scores it, appends `training-history.jsonl`, deletes the training save, **mutates 1–2 parameters** (±25% hill-climb around the best-so-far in `best-params.json`), writes `params.json`, and relaunches.
+- `params.json` — every strategy tunable (marking radius, zone sizes, building targets, pump thresholds, planning cadence). The mod loads it each game start; hand-edit it anytime to experiment.
+- Code-tier improvements: Claude reviews `training-history.jsonl` + episode logs between sessions and ships logic upgrades the parameter search can't discover.
+
+Design notes (original plan):
 
 1. **Episode runner (in-mod):** a MainMenu-context service reads `TrainingConfig.json` from the mod folder; when enabled it programmatically starts a new game (faction, difficulty, map, settlement name — the game's `NewGameConfiguration`/`GameSceneLoader` APIs support this) or loads a target save.
 2. **Metrics & scoring:** every in-game day the brain snapshots the success measures (population, wellbeing, water/food stocks vs. targets, science, logs, buildings completed, drought survival) into an episode log (JSON on disk).
