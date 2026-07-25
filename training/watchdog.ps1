@@ -124,12 +124,9 @@ try {
             Write-Host "  Game process never appeared - recording crash." -ForegroundColor Yellow
         }
         else {
-            # Give the mod screen time to render, then press Enter a few times
-            # to advance past it into the main menu.
-            Start-Sleep -Seconds 25
-            Send-Enter
-            Start-Sleep -Seconds 3
-            Send-Enter
+            # Mod-manager screen is skipped via Steam Launch Options:
+            # set  -skipModManager  in Timberborn's Steam properties (one-time,
+            # no Steam prompt that way). SendKeys/focus hacks proved unreliable.
             $deadline = (Get-Date).AddMinutes($EpisodeTimeoutMinutes)
             while ((Get-Process Timberborn -ErrorAction SilentlyContinue) -and
                    (Get-Date) -lt $deadline -and -not (Test-Path $stopPath)) {
