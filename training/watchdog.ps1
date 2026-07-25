@@ -87,15 +87,29 @@ try {
         if (Test-Path $resultPath) { Remove-Item $resultPath -Force }
 
         Write-Host ("[{0}] Episode {1}: launching game..." -f (Get-Date -Format 'HH:mm:ss'), $episode)
-        $proc = Start-Process -FilePath $GameExe -PassThru
-        $deadline = (Get-Date).AddMinutes($EpisodeTimeoutMinutes)
-        while (-not $proc.HasExited -and (Get-Date) -lt $deadline -and -not (Test-Path $stopPath)) {
-            Start-Sleep -Seconds 15
-        }
-        if (-not $proc.HasExited) {
-            Write-Host "  Timeout/stop - killing game." -ForegroundColor Yellow
-            try { Stop-Process -Id $proc.Id -Force -Confirm:$false } catch {}
+        Start-Process -FilePath $GameExe | Out-Null
+        # Steam bootstrap: the launched exe may exit and respawn via Steam,
+        # so track the game by PROCESS NAME, not the launcher handle.
+        $appeared = $false
+        $appearDeadline = (Get-Date).AddSeconds(180)
+        while ((Get-Date) -lt $appearDeadline) {
+            if (Get-Process Timberborn -ErrorAction SilentlyContinue) { $appeared = $true; break }
             Start-Sleep -Seconds 5
+        }
+        if (-not $appeared) {
+            Write-Host "  Game process never appeared - recording crash." -ForegroundColor Yellow
+        }
+        else {
+            $deadline = (Get-Date).AddMinutes($EpisodeTimeoutMinutes)
+            while ((Get-Process Timberborn -ErrorAction SilentlyContinue) -and
+                   (Get-Date) -lt $deadline -and -not (Test-Path $stopPath)) {
+                Start-Sleep -Seconds 15
+            }
+            if (Get-Process Timberborn -ErrorAction SilentlyContinue) {
+                Write-Host "  Timeout/stop - killing game." -ForegroundColor Yellow
+                try { Stop-Process -Name Timberborn -Force -Confirm:$false } catch {}
+                Start-Sleep -Seconds 10
+            }
         }
 
         $result = Read-Json $resultPath ([pscustomobject]@{ result = "crash"; score = -2000; reason = "no result written" })
