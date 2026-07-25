@@ -29,6 +29,7 @@ namespace TimberbornAutopilot.Training
         private TrainingConfig _config;
         private string _episodePath;
         private int _daysElapsed;
+        private int _consecutiveDryDays;
         private bool _ended;
 
         public EpisodeRecorder(EventBus eventBus, WorldModel worldModel,
@@ -94,6 +95,9 @@ namespace TimberbornAutopilot.Training
                 contaminated = s.ContaminatedBeavers,
             });
 
+            _consecutiveDryDays = (s.WaterStock == 0 && s.FoodStock == 0 && _daysElapsed > 3)
+                ? _consecutiveDryDays + 1 : 0;
+
             if (s.AverageWellbeing >= s.WellbeingUnlockTarget)
             {
                 EndEpisode("success", 10000 - _daysElapsed * 10, s,
@@ -102,6 +106,13 @@ namespace TimberbornAutopilot.Training
             else if (s.Adults + s.Children == 0)
             {
                 EndEpisode("extinct", -1000 + _daysElapsed, s, "Colony died out");
+            }
+            else if (_consecutiveDryDays >= 3)
+            {
+                // Death spiral: no food AND no water for 3 straight days —
+                // end early instead of burning wall-clock on a doomed run.
+                EndEpisode("starving", -500 + _daysElapsed, s,
+                    $"Death spiral: dry for {_consecutiveDryDays} days at day {_daysElapsed}");
             }
             else if (s.Cycle > _config.MaxCycles)
             {
