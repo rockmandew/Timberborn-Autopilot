@@ -27,6 +27,7 @@ namespace TimberbornAutopilot
             containerDefinition.Bind<AutopilotService>().AsSingleton();
             containerDefinition.MultiBind<IHttpApiEndpoint>().To<AutopilotStatusEndpoint>().AsSingleton();
             containerDefinition.MultiBind<IHttpApiEndpoint>().To<AutopilotDashboardEndpoint>().AsSingleton();
+            containerDefinition.MultiBind<IHttpApiEndpoint>().To<AutopilotRemoteEndpoint>().AsSingleton();
             containerDefinition.MultiBind<IHttpApiEndpoint>().ToExisting<AutopilotCommandEndpoint>();
         }
     }
