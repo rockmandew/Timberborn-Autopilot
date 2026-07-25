@@ -361,6 +361,21 @@ namespace TimberbornAutopilot.Planning
                     "Adding a Lodge — rested beavers work faster, and shared housing means kits."),
                 new Goal("campfire", new[] { "Campfire" }, 1, 12,
                     "Placing a Campfire — first rung of the wellbeing ladder toward Iron Teeth."),
+                // Wellbeing is BREADTH: each distinct satisfied need adds points
+                // (see docs/MECHANICS.md). Diversify food + fun + aesthetics.
+                new Goal("farm2", new[] { "EfficientFarmHouse" }, world.Cycle >= 2 ? 2 : 0, 18,
+                    "Second Farmhouse for potatoes — food VARIETY is wellbeing, not just calories.")
+                    { OnPlaced = ZonePotatoesAround },
+                new Goal("grill", new[] { "Grill" }, world.Cycle >= 2 ? 1 : 0, _params.DefaultSearchRadius,
+                    "Building a Grill — cooked food is another satisfied need on the ladder."),
+                new Goal("bench", new[] { "Bench" }, 2, 12,
+                    "Placing Benches — cheap aesthetics, another wellbeing need satisfied."),
+                new Goal("shrub", new[] { "Shrub" }, 2, 12,
+                    "Planting Shrubs — beauty counts toward the Iron Teeth threshold."),
+                new Goal("banner", new[] { "PoleBanner", "SquareBanner" }, 1, 12,
+                    "Raising a Banner — one more aesthetic need down."),
+                new Goal("terrace", new[] { "RooftopTerrace" }, world.Cycle >= 2 ? 1 : 0, 12,
+                    "Adding a Rooftop Terrace — leisure breadth for the final wellbeing push."),
             };
             return goals;
         }
@@ -386,6 +401,14 @@ namespace TimberbornAutopilot.Planning
             int zoned = _zonePlanner.ZonePlanting(
                 farm + new Vector3Int(-half, -half, 0), farm + new Vector3Int(half, half, 0), "Carrot");
             _brainLog.Note($"Zoned {zoned} tiles of carrots around the farm.");
+        }
+
+        private void ZonePotatoesAround(Vector3Int farm)
+        {
+            int half = _params.CarrotZoneHalf;
+            int zoned = _zonePlanner.ZonePlanting(
+                farm + new Vector3Int(-half, -half, 0), farm + new Vector3Int(half, half, 0), "Potato");
+            _brainLog.Note($"Zoned {zoned} tiles of potatoes — second food type for wellbeing breadth.");
         }
 
         private void ZoneTreesAround(Vector3Int forester)
