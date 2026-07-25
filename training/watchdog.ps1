@@ -87,7 +87,8 @@ try {
         if (Test-Path $resultPath) { Remove-Item $resultPath -Force }
 
         Write-Host ("[{0}] Episode {1}: launching game..." -f (Get-Date -Format 'HH:mm:ss'), $episode)
-        Start-Process -FilePath $GameExe | Out-Null
+        # -skipModManager: the game's own flag to bypass the mods OK screen.
+        Start-Process -FilePath $GameExe -ArgumentList "-skipModManager" | Out-Null
         # Steam bootstrap: the launched exe may exit and respawn via Steam,
         # so track the game by PROCESS NAME, not the launcher handle.
         $appeared = $false
