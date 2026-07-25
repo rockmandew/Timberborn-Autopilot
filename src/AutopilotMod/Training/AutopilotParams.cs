@@ -24,6 +24,7 @@ namespace TimberbornAutopilot.Training
         public int PlanningTickInterval = 30;
         public int PumpSearchRadius = 30;
         public int DefaultSearchRadius = 15;
+        public int MaxParallelSites = 6;
 
         /// <summary>DI creates this with defaults; AutopilotService copies the
         /// disk values in at game load.</summary>
@@ -40,6 +41,7 @@ namespace TimberbornAutopilot.Training
             PlanningTickInterval = other.PlanningTickInterval;
             PumpSearchRadius = other.PumpSearchRadius;
             DefaultSearchRadius = other.DefaultSearchRadius;
+            MaxParallelSites = other.MaxParallelSites;
         }
 
         public static string Directory => Path.Combine(UserDataFolder.Folder, "Autopilot");

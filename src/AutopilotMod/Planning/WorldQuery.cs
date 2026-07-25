@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Timberborn.BlockSystem;
 using Timberborn.BuilderPrioritySystem;
 using Timberborn.Buildings;
+using Timberborn.ConstructionSites;
 using Timberborn.Cutting;
 using Timberborn.EntitySystem;
 using Timberborn.GameDistricts;
@@ -52,6 +53,52 @@ namespace TimberbornAutopilot.Planning
             foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
             {
                 if (building.GameObject.name.StartsWith("Path"))
+                {
+                    continue;
+                }
+                var blockObject = building.GetComponent<BlockObject>();
+                if (blockObject == null || blockObject.Coordinates == districtCenter)
+                {
+                    continue;
+                }
+                doorsteps.Add(blockObject.HasEntrance
+                    ? blockObject.PositionedEntrance.DoorstepCoordinates
+                    : blockObject.Coordinates);
+            }
+            return doorsteps;
+        }
+
+        /// <summary>How many construction sites are still unfinished — the brain
+        /// stops placing new goals past a cap so materials/builders concentrate.</summary>
+        public int CountUnfinishedSites()
+        {
+            int count = 0;
+            foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
+            {
+                if (building.HasComponent<ConstructionSite>())
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>Doorsteps of buildings the GAME says are not connected to any
+        /// district (DistrictBuilding.District == null) — ground truth for the
+        /// unconnected monitor, excluding paths and district centers.</summary>
+        public List<Vector3Int> UnconnectedDoorsteps()
+        {
+            Vector3Int? districtCenter = DistrictCenterCoordinates();
+            var doorsteps = new List<Vector3Int>();
+            foreach (Building building in _entityComponentRegistry.GetEnabled<Building>())
+            {
+                if (building.GameObject.name.StartsWith("Path"))
+                {
+                    continue;
+                }
+                var districtBuilding = building.GetComponent<DistrictBuilding>();
+                if (districtBuilding == null ||
+                    districtBuilding.District != null || districtBuilding.ConstructionDistrict != null)
                 {
                     continue;
                 }

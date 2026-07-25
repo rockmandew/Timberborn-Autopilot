@@ -3,6 +3,7 @@ using System.IO;
 using Newtonsoft.Json;
 using Timberborn.GameCycleSystem;
 using Timberborn.SingletonSystem;
+using Timberborn.TickSystem;
 using TimberbornAutopilot.Acting;
 using TimberbornAutopilot.Planning;
 using TimberbornAutopilot.Sensing;
@@ -17,8 +18,9 @@ namespace TimberbornAutopilot.Training
     /// the run, writes last-result.json for the watchdog, and exits the game.
     /// Inert unless training.json says Enabled.
     /// </summary>
-    public class EpisodeRecorder : ILoadableSingleton
+    public class EpisodeRecorder : ILoadableSingleton, ITickableSingleton
     {
+        private bool _speedApplied;
         private readonly EventBus _eventBus;
         private readonly WorldModel _worldModel;
         private readonly SpeedController _speedController;
@@ -49,9 +51,19 @@ namespace TimberbornAutopilot.Training
             _episodePath = Path.Combine(AutopilotParams.Directory, "episodes",
                 $"episode_{DateTime.Now:yyyyMMdd_HHmmss}.jsonl");
             _eventBus.Register(this);
-            _speedController.SetSpeed(_config.GameSpeed);
             _brainLog.Note($"TRAINING EPISODE started — target: wellbeing " +
                            $"{_worldModel.Snapshot().WellbeingUnlockTarget}, horizon {_config.MaxCycles} cycles.");
+        }
+
+        /// <summary>Speed must be applied AFTER the game finishes its own load-time
+        /// speed reset — first tick is the earliest safe moment.</summary>
+        public void Tick()
+        {
+            if (!_speedApplied && _config.Enabled && !_ended)
+            {
+                _speedApplied = true;
+                _speedController.SetSpeed(_config.GameSpeed);
+            }
         }
 
         [OnEvent]
@@ -62,6 +74,8 @@ namespace TimberbornAutopilot.Training
                 return;
             }
             _daysElapsed++;
+            // Re-assert speed daily in case anything reset it.
+            _speedController.SetSpeed(_config.GameSpeed);
             WorldSnapshot s = _worldModel.Snapshot();
             AppendEpisodeLine(new
             {

@@ -78,8 +78,21 @@ namespace TimberbornAutopilot.Planning
             Vector3Int networkRoot = doorstep.Value;
             WorldSnapshot world = _worldModel.Snapshot();
 
+            // Concentrate materials/builders: no new sites past the cap.
+            int unfinished = _worldQuery.CountUnfinishedSites();
+            bool constructionSaturated = unfinished >= _params.MaxParallelSites;
+            if (constructionSaturated && _givenSuggestions.Add($"saturated-c{world.Cycle}d{world.CycleDay}"))
+            {
+                _brainLog.Note($"{unfinished} sites under construction — holding new placements " +
+                               "until builders catch up.");
+            }
+
             foreach (Goal goal in BuildGoals(world, anchor))
             {
+                if (constructionSaturated)
+                {
+                    break;
+                }
                 int have = CountAny(goal.TemplateCandidates);
                 if (have >= goal.TargetCount)
                 {
@@ -116,6 +129,23 @@ namespace TimberbornAutopilot.Planning
                 foreach (Vector3Int flag in _worldQuery.BuildingCoordinatesByName("LumberjackFlag"))
                 {
                     MarkCuttingAreaAround(flag);
+                }
+                // Unconnected monitor: the game's own district assignment is the
+                // ground truth — anything with no district gets a route attempt.
+                List<Vector3Int> unconnected = _worldQuery.UnconnectedDoorsteps();
+                if (unconnected.Count > 0)
+                {
+                    int fixedCount = 0;
+                    foreach (Vector3Int orphanDoorstep in unconnected)
+                    {
+                        if (_pathRouter.Connect(networkRoot, orphanDoorstep, out string routeReport) &&
+                            !routeReport.Contains("gaps"))
+                        {
+                            fixedCount++;
+                        }
+                    }
+                    _brainLog.Announce($"{unconnected.Count} building(s) were disconnected — " +
+                                       $"routed {fixedCount} back to the district network.");
                 }
             }
             RepairConnectivity(networkRoot);

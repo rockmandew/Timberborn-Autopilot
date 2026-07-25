@@ -6,7 +6,7 @@ namespace TimberbornAutopilot.Acting
     /// <summary>Game speed control beyond the UI's 3x cap.</summary>
     public class SpeedController
     {
-        private const float MaxSpeed = 10f;
+        private const float MaxSpeed = 30f;
 
         private readonly SpeedManager _speedManager;
 
