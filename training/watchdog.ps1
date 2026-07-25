@@ -35,6 +35,27 @@ $intKeys = @("TreeMarkRadius","CarrotZoneHalf","PineZoneHalf","LumberjackTarget"
              "TankTarget","LodgeTarget","SecondPumpEarliestDay","PlanningTickInterval",
              "PumpSearchRadius","DefaultSearchRadius")
 
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+function Send-Enter {
+    try {
+        $p = Get-Process Timberborn -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+        if ($p) {
+            [Win32]::ShowWindow($p.MainWindowHandle, 9) | Out-Null   # SW_RESTORE
+            [Win32]::SetForegroundWindow($p.MainWindowHandle) | Out-Null
+            Start-Sleep -Milliseconds 500
+            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+        }
+    } catch { Write-Host "  Send-Enter failed: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+Add-Type -AssemblyName System.Windows.Forms
+
 function Read-Json($path, $fallback) {
     if (Test-Path $path) { try { return Get-Content $path -Raw | ConvertFrom-Json } catch {} }
     return $fallback
@@ -87,8 +108,10 @@ try {
         if (Test-Path $resultPath) { Remove-Item $resultPath -Force }
 
         Write-Host ("[{0}] Episode {1}: launching game..." -f (Get-Date -Format 'HH:mm:ss'), $episode)
-        # -skipModManager: the game's own flag to bypass the mods OK screen.
-        Start-Process -FilePath $GameExe -ArgumentList "-skipModManager" | Out-Null
+        # Launch with NO args (custom args trigger a Steam confirmation prompt
+        # that blocks unattended runs). The mod-manager OK screen is dismissed
+        # by sending Enter to the window instead (the panel advances on Enter).
+        Start-Process -FilePath $GameExe | Out-Null
         # Steam bootstrap: the launched exe may exit and respawn via Steam,
         # so track the game by PROCESS NAME, not the launcher handle.
         $appeared = $false
@@ -99,6 +122,14 @@ try {
         }
         if (-not $appeared) {
             Write-Host "  Game process never appeared - recording crash." -ForegroundColor Yellow
+        }
+        else {
+            # Give the mod screen time to render, then press Enter a few times
+            # to advance past it into the main menu.
+            Start-Sleep -Seconds 25
+            Send-Enter
+            Start-Sleep -Seconds 3
+            Send-Enter
         }
         else {
             $deadline = (Get-Date).AddMinutes($EpisodeTimeoutMinutes)
