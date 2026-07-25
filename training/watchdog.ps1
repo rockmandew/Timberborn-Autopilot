@@ -130,8 +130,6 @@ try {
             Send-Enter
             Start-Sleep -Seconds 3
             Send-Enter
-        }
-        else {
             $deadline = (Get-Date).AddMinutes($EpisodeTimeoutMinutes)
             while ((Get-Process Timberborn -ErrorAction SilentlyContinue) -and
                    (Get-Date) -lt $deadline -and -not (Test-Path $stopPath)) {
