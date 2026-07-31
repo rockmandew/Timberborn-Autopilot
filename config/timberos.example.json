@@ -1,0 +1,79 @@
+{
+  "$comment": "Copy to config/timberos.json and adjust. Endpoint paths are educated defaults — verify with `npm run probe` against your game version first.",
+  "endpoints": {
+    "baseUrl": "http://localhost:8080",
+    "listAdapters": "/adapters",
+    "listLevers": "/levers",
+    "setLever": "/levers/{name}/set?state={state}"
+  },
+  "gateway": {
+    "port": 8081,
+    "pollMs": 1000,
+    "debounceReads": 2,
+    "trendWindowMs": 180000,
+    "commandTimeoutMs": 15000,
+    "eventStore": "data/events.sqlite"
+  },
+  "sensors": [
+    {
+      "id": "RES.UPPER.DEPTH",
+      "label": "Upper Reservoir",
+      "unit": "m",
+      "fullScale": 3.0,
+      "alarms": [
+        { "belowOrAt": 2.0, "severity": "warning", "message": "Upper reservoir below safe operating level" },
+        { "belowOrAt": 1.0, "severity": "critical", "message": "Upper reservoir critically low" }
+      ]
+    },
+    {
+      "id": "SOIL.NORTH_FIELDS.MOISTURE",
+      "label": "North Fields Moisture",
+      "unit": "",
+      "fullScale": 1.0,
+      "alarms": [
+        { "belowOrAt": 0.4, "severity": "warning", "message": "North fields beginning to dry" },
+        { "belowOrAt": 0.2, "severity": "critical", "message": "North fields critically dry" }
+      ]
+    },
+    {
+      "id": "WATER.TOTAL",
+      "label": "Colony Water Stock",
+      "unit": "L",
+      "fullScale": 10000,
+      "alarms": [
+        { "belowOrAt": 5000, "severity": "warning", "message": "Water reserves entered rationing range" },
+        { "belowOrAt": 2500, "severity": "critical", "message": "Water reserves at emergency level" }
+      ]
+    }
+  ],
+  "gates": [
+    { "id": "FG.UPPER.SPILLWAY", "label": "Upper Spillway" },
+    { "id": "FG.UPPER.IRRIGATION", "label": "Irrigation Gate" },
+    { "id": "FG.BADWATER.DIVERSION", "label": "Badwater Diversion", "confirmRequired": true },
+    { "id": "FG.CENTRAL.CONTAM_INLET", "label": "Contamination Inlet", "confirmRequired": true }
+  ],
+  "interlocks": [
+    {
+      "id": "contam-inlet-needs-diversion",
+      "description": "Contamination inlet may only open while the badwater diversion is confirmed open",
+      "gate": "FG.CENTRAL.CONTAM_INLET",
+      "whenCommanded": "open",
+      "require": { "gate": "FG.BADWATER.DIVERSION", "state": "open" }
+    },
+    {
+      "id": "no-full-spillway-when-low",
+      "description": "Spillway may not open past 1.5 m while the upper reservoir is below 1.5 m",
+      "gate": "FG.UPPER.SPILLWAY",
+      "whenCommanded": 3.0,
+      "require": { "sensor": "RES.UPPER.DEPTH", "atLeast": 1.5 }
+    }
+  ],
+  "modes": [
+    { "id": "normal", "label": "Normal Operations", "description": "Gates follow standard automation; standard alert thresholds." },
+    { "id": "drought_prep", "label": "Drought Preparation", "description": "Fill priority reservoirs, restrict nonessential outflow." },
+    { "id": "drought_emergency", "label": "Drought Emergency", "description": "Close discretionary releases; preserve drinking water." },
+    { "id": "badtide_isolation", "label": "Badtide Isolation", "description": "Clean-water intakes closed, diversion routes open." },
+    { "id": "recovery", "label": "Reservoir Recovery", "description": "Controlled refill; irrigation limited until safe depth is restored." },
+    { "id": "manual", "label": "Manual Engineering", "suspendAutomation": true, "description": "Automation suspended; every command logged; hold-to-confirm on high-risk controls." }
+  ]
+}

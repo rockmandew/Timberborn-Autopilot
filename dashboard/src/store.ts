@@ -1,0 +1,90 @@
+import { create } from 'zustand'
+import type { CommandResult, EventRecord, Snapshot } from './types'
+
+interface TimberOSStore {
+  snapshot: Snapshot | null
+  events: EventRecord[]
+  /** Gateway (not game) connectivity — the WS to :8081. */
+  gatewayOnline: boolean
+  /** Transient result of the last command, for the toast strip. */
+  lastCommand: CommandResult | null
+
+  connect(): void
+  refreshEvents(): Promise<void>
+  commandGate(gateId: string, position: number | 'OPEN' | 'CLOSED', confirm?: boolean): Promise<CommandResult>
+  setMode(mode: string): Promise<CommandResult>
+  dismissCommandResult(): void
+}
+
+export const useTimberOS = create<TimberOSStore>((set, get) => ({
+  snapshot: null,
+  events: [],
+  gatewayOnline: false,
+  lastCommand: null,
+
+  connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    const socket = new WebSocket(`${proto}://${location.host}/ws`)
+
+    socket.onopen = () => {
+      set({ gatewayOnline: true })
+      void get().refreshEvents()
+    }
+    socket.onmessage = (msg) => {
+      const parsed = JSON.parse(msg.data as string) as { type: string; data: Snapshot }
+      if (parsed.type === 'snapshot') set({ snapshot: parsed.data })
+    }
+    socket.onclose = () => {
+      set({ gatewayOnline: false })
+      setTimeout(() => get().connect(), 2000)
+    }
+    socket.onerror = () => socket.close()
+  },
+
+  async refreshEvents() {
+    try {
+      const res = await fetch('/api/events?limit=100')
+      if (res.ok) set({ events: (await res.json()) as EventRecord[] })
+    } catch {
+      // Gateway offline — the WS reconnect loop will retry.
+    }
+  },
+
+  async commandGate(gateId, position, confirm = false) {
+    const result = await postJson<CommandResult>(`/api/gates/${encodeURIComponent(gateId)}/position`, {
+      position,
+      confirm,
+    })
+    set({ lastCommand: result })
+    void get().refreshEvents()
+    return result
+  },
+
+  async setMode(mode) {
+    const result = await postJson<CommandResult>('/api/mode', { mode })
+    set({ lastCommand: result })
+    void get().refreshEvents()
+    return result
+  },
+
+  dismissCommandResult() {
+    set({ lastCommand: null })
+  },
+}))
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return (await res.json()) as T
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'error',
+      message: err instanceof Error ? err.message : 'Gateway unreachable',
+    } as T
+  }
+}

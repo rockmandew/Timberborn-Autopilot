@@ -1,0 +1,26 @@
+{
+  "name": "@timberos/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TimberOS Gateway — bridges the Timberborn HTTP API to the dashboard, rules engine and annunciators",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "dev:sim": "tsx src/index.ts --simulate",
+    "probe": "tsx src/probe.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/websocket": "^11.0.1",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

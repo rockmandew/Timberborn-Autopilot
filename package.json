@@ -1,0 +1,18 @@
+{
+  "name": "timberos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SCADA-style waterworks command center for Timberborn",
+  "workspaces": [
+    "gateway",
+    "dashboard"
+  ],
+  "scripts": {
+    "gateway": "npm run dev --workspace gateway",
+    "gateway:sim": "npm run dev:sim --workspace gateway",
+    "dashboard": "npm run dev --workspace dashboard",
+    "probe": "npm run probe --workspace gateway",
+    "build": "npm run build --workspace gateway && npm run build --workspace dashboard",
+    "typecheck": "npm run typecheck --workspace gateway && npm run typecheck --workspace dashboard"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+config/timberos.json
+data/
+*.sqlite
+*.sqlite-journal
